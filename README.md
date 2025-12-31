@@ -6,8 +6,6 @@ An in-browser, canvas-based homage to the classic Pac-Man arcade game. This proj
 
 ![PacMan preview](images/pacman-preview.png)
 
-*If you don't see the image, open the project locally and capture a screenshot of the running game.*
-
 ## What’s inside
 
 - **index.html** – minimal shell that loads the canvas, sprites, and scripts.
