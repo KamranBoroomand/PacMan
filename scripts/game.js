@@ -92,6 +92,20 @@ let ghostsr = [];
 let wallSpaceWidth = oneBlockSize / 1.6;
 let wallOffset = (oneBlockSize - wallSpaceWidth) / 2;
 let wallInnerColor = "black";
+const FRUIT_SPAWN_DELAY_MS = 12000;
+const FRUIT_VISIBLE_MS = 10000;
+const FRUIT_INVINCIBILITY_MS = 8000;
+const FRUIT_SCORE = 50;
+const GHOST_EAT_BASE_SCORE = 20;
+let invincibleUntil = 0;
+let ghostEatChain = 0;
+let fruit = {
+  active: false,
+  x: 0,
+  y: 0,
+  expiresAt: 0,
+  nextSpawnAt: Date.now() + FRUIT_SPAWN_DELAY_MS,
+};
 
 // Legend:
 // 1 = wall, 2 = pellet, 4 = power pellet, 0 = empty path
@@ -196,6 +210,73 @@ function getRandomWalkableTile(options = {}) {
   return { x: 1, y: 1 };
 }
 
+function getRandomReachableTile(options = {}) {
+  const {
+    minX = 0,
+    maxX = map[0].length - 1,
+    minY = 0,
+    maxY = map.length - 1,
+    forbidden = new Set(),
+  } = options;
+
+  if (!pacman || typeof pacman.getMapX !== "function") {
+    return getRandomWalkableTile(options);
+  }
+
+  const startX = pacman.getMapX();
+  const startY = pacman.getMapY();
+  if (!isWalkableTile(startY, startX)) {
+    return getRandomWalkableTile(options);
+  }
+
+  const visited = new Set();
+  const queue = [{ x: startX, y: startY }];
+  const reachableTiles = [];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const key = `${current.x},${current.y}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    if (!isWalkableTile(current.y, current.x)) continue;
+
+    if (
+      current.x >= minX &&
+      current.x <= maxX &&
+      current.y >= minY &&
+      current.y <= maxY
+    ) {
+      reachableTiles.push({ x: current.x, y: current.y });
+    }
+
+    queue.push({ x: current.x - 1, y: current.y });
+    queue.push({ x: current.x + 1, y: current.y });
+    queue.push({ x: current.x, y: current.y - 1 });
+    queue.push({ x: current.x, y: current.y + 1 });
+  }
+
+  if (reachableTiles.length === 0) {
+    return getRandomWalkableTile(options);
+  }
+
+  const preferredTiles = reachableTiles.filter((tile) => {
+    const key = `${tile.x},${tile.y}`;
+    return !forbidden.has(key);
+  });
+
+  const nonPacmanTiles = reachableTiles.filter(
+    (tile) => !(tile.x === startX && tile.y === startY)
+  );
+  const candidates =
+    preferredTiles.length > 0
+      ? preferredTiles
+      : nonPacmanTiles.length > 0
+      ? nonPacmanTiles
+      : reachableTiles;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
 function hasRemainingFood() {
   for (let i = 0; i < map.length; i++) {
     for (let j = 0; j < map[0].length; j++) {
@@ -209,6 +290,129 @@ function hasRemainingFood() {
 
 function resetMap() {
   map = cloneClassicMap();
+}
+
+function isPacmanInvincible() {
+  return Date.now() < invincibleUntil;
+}
+
+function resetFruitState() {
+  fruit.active = false;
+  fruit.expiresAt = 0;
+  fruit.nextSpawnAt = Date.now() + FRUIT_SPAWN_DELAY_MS;
+  invincibleUntil = 0;
+  ghostEatChain = 0;
+}
+
+function spawnFruit() {
+  if (!pacman) return;
+
+  const forbidden = new Set();
+  forbidden.add(`${pacman.getMapX()},${pacman.getMapY()}`);
+  for (let i = 0; i < ghosts.length; i++) {
+    forbidden.add(`${ghosts[i].getMapX()},${ghosts[i].getMapY()}`);
+  }
+
+  const tile = getRandomReachableTile({
+    minX: 1,
+    maxX: map[0].length - 2,
+    minY: 1,
+    maxY: map.length - 2,
+    forbidden,
+  });
+
+  fruit.active = true;
+  fruit.x = tile.x;
+  fruit.y = tile.y;
+  fruit.expiresAt = Date.now() + FRUIT_VISIBLE_MS;
+}
+
+function updateFruitState() {
+  const now = Date.now();
+
+  if (now >= invincibleUntil) {
+    ghostEatChain = 0;
+  }
+
+  if (fruit.active && now >= fruit.expiresAt) {
+    fruit.active = false;
+    fruit.expiresAt = 0;
+    fruit.nextSpawnAt = now + FRUIT_SPAWN_DELAY_MS;
+  }
+
+  if (!fruit.active && now >= fruit.nextSpawnAt && hasRemainingFood()) {
+    spawnFruit();
+  }
+}
+
+function tryConsumeFruit() {
+  if (!fruit.active) return;
+  if (pacman.getMapX() !== fruit.x || pacman.getMapY() !== fruit.y) return;
+
+  fruit.active = false;
+  fruit.expiresAt = 0;
+  fruit.nextSpawnAt = Date.now() + FRUIT_SPAWN_DELAY_MS;
+  score += FRUIT_SCORE;
+  invincibleUntil = Date.now() + FRUIT_INVINCIBILITY_MS;
+  ghostEatChain = 0;
+}
+
+function getCollidingGhostIndices() {
+  const collidingIndices = [];
+  const pacmanTileX = pacman.getMapX();
+  const pacmanTileY = pacman.getMapY();
+
+  for (let i = 0; i < ghosts.length; i++) {
+    if (
+      ghosts[i].getMapX() === pacmanTileX &&
+      ghosts[i].getMapY() === pacmanTileY
+    ) {
+      collidingIndices.push(i);
+    }
+  }
+
+  return collidingIndices;
+}
+
+function respawnGhostAtRandomTile(ghostIndex) {
+  const ghost = ghosts[ghostIndex];
+  if (!ghost) return;
+
+  const forbidden = new Set();
+  forbidden.add(`${pacman.getMapX()},${pacman.getMapY()}`);
+  if (fruit.active) {
+    forbidden.add(`${fruit.x},${fruit.y}`);
+  }
+  for (let i = 0; i < ghosts.length; i++) {
+    if (i === ghostIndex) continue;
+    forbidden.add(`${ghosts[i].getMapX()},${ghosts[i].getMapY()}`);
+  }
+
+  const tile = getRandomReachableTile({
+    minX: 1,
+    maxX: map[0].length - 2,
+    minY: 1,
+    maxY: map.length - 2,
+    forbidden,
+  });
+
+  ghost.x = tile.x * oneBlockSize;
+  ghost.y = tile.y * oneBlockSize;
+  ghost.direction = DIRECTION_RIGHT;
+  ghost.randomTargetIndex = parseInt(
+    Math.random() * randomTargetsForGhosts.length
+  );
+  ghost.target = randomTargetsForGhosts[ghost.randomTargetIndex];
+}
+
+function eatCollidingGhosts(collidingIndices) {
+  const uniqueIndices = [...new Set(collidingIndices)];
+  for (let i = 0; i < uniqueIndices.length; i++) {
+    const points = GHOST_EAT_BASE_SCORE * Math.pow(2, ghostEatChain);
+    score += points;
+    ghostEatChain = Math.min(ghostEatChain + 1, 6);
+    respawnGhostAtRandomTile(uniqueIndices[i]);
+  }
 }
 
 let randomTargetsForGhosts = [
@@ -287,6 +491,7 @@ let restartPacmanAndGhosts = () => {
 
 let onGhostCollision = () => {
   lives--;
+  resetFruitState();
 
   if (lives <= 0) {
     alert("Game Over!\nPress 'OK' to restart.\nYour Score: " + score);
@@ -305,6 +510,7 @@ let onGhostCollision = () => {
 let onLevelComplete = () => {
   alert("You cleared the maze!\nPress 'OK' for the next round.\nScore: " + score);
   resetMap();
+  resetFruitState();
   restartPacmanAndGhosts();
 };
 
@@ -327,11 +533,20 @@ let onLevelComplete = () => {
 let update = () => {
   pacman.moveProcess();
   pacman.eat();
+  updateFruitState();
+  tryConsumeFruit();
   updateGhosts();
-  if (pacman.checkGhostCollision(ghosts)) {
-    onGhostCollision();
-    return;
+
+  const collidingGhostIndices = getCollidingGhostIndices();
+  if (collidingGhostIndices.length > 0) {
+    if (isPacmanInvincible()) {
+      eatCollidingGhosts(collidingGhostIndices);
+    } else {
+      onGhostCollision();
+      return;
+    }
   }
+
   if (!hasRemainingFood()) {
     onLevelComplete();
   }
@@ -354,6 +569,61 @@ let drawFoods = () => {
           }
         }
     }
+};
+
+let drawFruit = () => {
+    if (!fruit.active) return;
+
+    const tileX = fruit.x * oneBlockSize;
+    const tileY = fruit.y * oneBlockSize;
+    const cherryRadius = oneBlockSize * 0.22;
+    const centerY = tileY + oneBlockSize * 0.62;
+    const centerLeftX = tileX + oneBlockSize * 0.40;
+    const centerRightX = tileX + oneBlockSize * 0.63;
+
+    canvasContext.strokeStyle = "#68D98E";
+    canvasContext.lineWidth = Math.max(2, oneBlockSize * 0.08);
+    canvasContext.beginPath();
+    canvasContext.moveTo(centerLeftX, centerY - cherryRadius);
+    canvasContext.quadraticCurveTo(
+      tileX + oneBlockSize * 0.43,
+      tileY + oneBlockSize * 0.08,
+      tileX + oneBlockSize * 0.50,
+      tileY + oneBlockSize * 0.28
+    );
+    canvasContext.moveTo(centerRightX, centerY - cherryRadius);
+    canvasContext.quadraticCurveTo(
+      tileX + oneBlockSize * 0.71,
+      tileY + oneBlockSize * 0.14,
+      tileX + oneBlockSize * 0.54,
+      tileY + oneBlockSize * 0.28
+    );
+    canvasContext.stroke();
+
+    canvasContext.fillStyle = "#FF2E59";
+    canvasContext.beginPath();
+    canvasContext.arc(centerLeftX, centerY, cherryRadius, 0, 2 * Math.PI);
+    canvasContext.arc(centerRightX, centerY, cherryRadius, 0, 2 * Math.PI);
+    canvasContext.fill();
+
+    canvasContext.fillStyle = "#FFDDE5";
+    const shineRadius = cherryRadius * 0.35;
+    canvasContext.beginPath();
+    canvasContext.arc(
+      centerLeftX - cherryRadius * 0.35,
+      centerY - cherryRadius * 0.3,
+      shineRadius,
+      0,
+      2 * Math.PI
+    );
+    canvasContext.arc(
+      centerRightX - cherryRadius * 0.35,
+      centerY - cherryRadius * 0.3,
+      shineRadius,
+      0,
+      2 * Math.PI
+    );
+    canvasContext.fill();
 };
 
 let drawRemainingLives = () => {
@@ -386,6 +656,20 @@ let drawScore = () => {
     );
 };
 
+let drawPowerModeStatus = () => {
+    if (!isPacmanInvincible()) return;
+
+    const remainingMs = Math.max(0, invincibleUntil - Date.now());
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+    canvasContext.font = "16px Emulogic";
+    canvasContext.fillStyle = "#78F7FF";
+    canvasContext.fillText(
+        "POWER: " + remainingSeconds + "s",
+        0,
+        oneBlockSize * (map.length + 1.8)
+    );
+};
+
 let draw = () => {
   // Clear the *logical* canvas (important when using setTransform with scaling)
   canvasContext.clearRect(0, 0, logicalW, logicalH);
@@ -395,10 +679,12 @@ let draw = () => {
 
   drawWalls();
   drawFoods();
+  drawFruit();
   drawGhosts();
   pacman.draw();
   drawScore();
   drawRemainingLives();
+  drawPowerModeStatus();
 };
 
 
@@ -526,7 +812,7 @@ let createGhosts = () => {
   forbidden.add(`${pacmanStart.x},${pacmanStart.y}`);
 
   for (let i = 0; i < ghostCount; i++) {
-    const tile = getRandomWalkableTile({
+    const tile = getRandomReachableTile({
       minX: 1,
       maxX: map[0].length - 2,
       minY: 1,
@@ -553,6 +839,7 @@ let createGhosts = () => {
   }
 };
 
+resetFruitState();
 createNewPacman();
 createGhosts();
 startGame();
