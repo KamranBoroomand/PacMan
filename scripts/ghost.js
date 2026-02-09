@@ -24,9 +24,16 @@ class Ghost {
         this.range = range;
         this.randomTargetIndex = parseInt(Math.random() * 4);
         this.target = randomTargetsForGhosts[this.randomTargetIndex];
-        setInterval(() => {
+        this.directionTimer = setInterval(() => {
             this.changeRandomDirection();
         }, 10000);
+    }
+
+    dispose() {
+        if (this.directionTimer) {
+            clearInterval(this.directionTimer);
+            this.directionTimer = null;
+        }
     }
 
     isInRange() {
@@ -55,9 +62,28 @@ class Ghost {
         }
         this.changeDirectionIfPossible();
         this.moveForwards();
+        this.handleTunnelWrap();
         if (this.checkCollisions()) {
             this.moveBackwards();
             return;
+        }
+    }
+
+    handleTunnelWrap() {
+        const centerY = Math.floor((this.y + this.height / 2) / oneBlockSize);
+        const lastColumn = map[0].length - 1;
+        const maxX = (lastColumn + 1) * oneBlockSize;
+
+        if (centerY < 0 || centerY >= map.length) return;
+
+        const isTunnelRow =
+            map[centerY][0] !== 1 && map[centerY][lastColumn] !== 1;
+        if (!isTunnelRow) return;
+
+        if (this.x + this.width <= 0) {
+            this.x = lastColumn * oneBlockSize;
+        } else if (this.x >= maxX) {
+            this.x = 0;
         }
     }
 
@@ -96,24 +122,26 @@ class Ghost {
     }
 
     checkCollisions() {
-        let isCollided = false;
+        const top = Math.floor(this.y / oneBlockSize);
+        const left = Math.floor(this.x / oneBlockSize);
+        const bottom = Math.floor((this.y + this.height - 1) / oneBlockSize);
+        const right = Math.floor((this.x + this.width - 1) / oneBlockSize);
+
         if (
-            map[parseInt(this.y / oneBlockSize)][
-                parseInt(this.x / oneBlockSize)
-            ] == 1 ||
-            map[parseInt(this.y / oneBlockSize + 0.9999)][
-                parseInt(this.x / oneBlockSize)
-            ] == 1 ||
-            map[parseInt(this.y / oneBlockSize)][
-                parseInt(this.x / oneBlockSize + 0.9999)
-            ] == 1 ||
-            map[parseInt(this.y / oneBlockSize + 0.9999)][
-                parseInt(this.x / oneBlockSize + 0.9999)
-            ] == 1
+            top < 0 ||
+            left < 0 ||
+            bottom >= map.length ||
+            right >= map[0].length
         ) {
-            isCollided = true;
+            return true;
         }
-        return isCollided;
+
+        return (
+            map[top][left] == 1 ||
+            map[bottom][left] == 1 ||
+            map[top][right] == 1 ||
+            map[bottom][right] == 1
+        );
     }
 
     changeDirectionIfPossible() {

@@ -9,14 +9,22 @@ class Pacman {
         this.nextDirection = 4;
         this.frameCount = 7;
         this.currentFrame = 1;
-        setInterval(() => {
+        this.animationTimer = setInterval(() => {
             this.changeAnimation();
         }, 100);
+    }
+
+    dispose() {
+        if (this.animationTimer) {
+            clearInterval(this.animationTimer);
+            this.animationTimer = null;
+        }
     }
 
     moveProcess() {
         this.changeDirectionIfPossible();
         this.moveForwards();
+        this.handleTunnelWrap();
         if (this.checkCollisions()) {
             this.moveBackwards();
             return;
@@ -24,18 +32,35 @@ class Pacman {
     }
 
     eat() {
-        for (let i = 0; i < map.length; i++) {
-            for (let j = 0; j < map[0].length; j++) {
-                if (
-                    (map[i][j] === 2 || map[i][j] === 4) &&
-                    this.getMapX() == j &&
-                    this.getMapY() == i
-                ) {
-                    const isPowerPellet = map[i][j] === 4;
-                    map[i][j] = 0;
-                    score += isPowerPellet ? 5 : 1;
-                }
-            }
+        const mapX = this.getMapX();
+        const mapY = this.getMapY();
+
+        if (mapY < 0 || mapY >= map.length || mapX < 0 || mapX >= map[0].length) {
+            return;
+        }
+
+        if (map[mapY][mapX] === 2 || map[mapY][mapX] === 4) {
+            const isPowerPellet = map[mapY][mapX] === 4;
+            map[mapY][mapX] = 0;
+            score += isPowerPellet ? 5 : 1;
+        }
+    }
+
+    handleTunnelWrap() {
+        const centerY = Math.floor((this.y + this.height / 2) / oneBlockSize);
+        const lastColumn = map[0].length - 1;
+        const maxX = (lastColumn + 1) * oneBlockSize;
+
+        if (centerY < 0 || centerY >= map.length) return;
+
+        const isTunnelRow =
+            map[centerY][0] !== 1 && map[centerY][lastColumn] !== 1;
+        if (!isTunnelRow) return;
+
+        if (this.x + this.width <= 0) {
+            this.x = lastColumn * oneBlockSize;
+        } else if (this.x >= maxX) {
+            this.x = 0;
         }
     }
 
@@ -74,24 +99,26 @@ class Pacman {
     }
 
     checkCollisions() {
-        let isCollided = false;
+        const top = Math.floor(this.y / oneBlockSize);
+        const left = Math.floor(this.x / oneBlockSize);
+        const bottom = Math.floor((this.y + this.height - 1) / oneBlockSize);
+        const right = Math.floor((this.x + this.width - 1) / oneBlockSize);
+
         if (
-            map[parseInt(this.y / oneBlockSize)][
-                parseInt(this.x / oneBlockSize)
-            ] == 1 ||
-            map[parseInt(this.y / oneBlockSize + 0.9999)][
-                parseInt(this.x / oneBlockSize)
-            ] == 1 ||
-            map[parseInt(this.y / oneBlockSize)][
-                parseInt(this.x / oneBlockSize + 0.9999)
-            ] == 1 ||
-            map[parseInt(this.y / oneBlockSize + 0.9999)][
-                parseInt(this.x / oneBlockSize + 0.9999)
-            ] == 1
+            top < 0 ||
+            left < 0 ||
+            bottom >= map.length ||
+            right >= map[0].length
         ) {
-            isCollided = true;
+            return true;
         }
-        return isCollided;
+
+        return (
+            map[top][left] == 1 ||
+            map[bottom][left] == 1 ||
+            map[top][right] == 1 ||
+            map[bottom][right] == 1
+        );
     }
 
     checkGhostCollision(ghosts) {

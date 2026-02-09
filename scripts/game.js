@@ -148,8 +148,10 @@ classicMap[26][26] = 4;
 classicMap[pacmanStart.y][pacmanStart.x] = 0;
 classicMap[pacmanStart.y][pacmanStart.x + 1] = 0;
 
+const cloneClassicMap = () => classicMap.map((row) => row.slice());
+
 // Live map instance (coins get consumed during play)
-let map = classicMap.map((row) => row.slice());
+let map = cloneClassicMap();
 // Fit canvas to screen once map is available
 
 resizeCanvasToFitViewport();
@@ -192,6 +194,21 @@ function getRandomWalkableTile(options = {}) {
 
   // If we couldn't find a tile, fall back to (1,1)
   return { x: 1, y: 1 };
+}
+
+function hasRemainingFood() {
+  for (let i = 0; i < map.length; i++) {
+    for (let j = 0; j < map[0].length; j++) {
+      if (map[i][j] === 2 || map[i][j] === 4) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function resetMap() {
+  map = cloneClassicMap();
 }
 
 let randomTargetsForGhosts = [
@@ -255,6 +272,15 @@ function startGame() {
 }
 
 let restartPacmanAndGhosts = () => {
+    if (pacman && typeof pacman.dispose === "function") {
+      pacman.dispose();
+    }
+    for (let i = 0; i < ghosts.length; i++) {
+      if (ghosts[i] && typeof ghosts[i].dispose === "function") {
+        ghosts[i].dispose();
+      }
+    }
+    ghosts = [];
     createNewPacman();
     createGhosts();
 };
@@ -269,10 +295,16 @@ let onGhostCollision = () => {
     lives = 3;     // classic restart lives
     // lives = 999; // "unlimited life" feel (your call)
 
-    score = 0; // optional: reset score
-    // Optional: reset pellets too if you want a true restart.
+    score = 0;
+    resetMap();
   }
 
+  restartPacmanAndGhosts();
+};
+
+let onLevelComplete = () => {
+  alert("You cleared the maze!\nPress 'OK' for the next round.\nScore: " + score);
+  resetMap();
   restartPacmanAndGhosts();
 };
 
@@ -298,6 +330,10 @@ let update = () => {
   updateGhosts();
   if (pacman.checkGhostCollision(ghosts)) {
     onGhostCollision();
+    return;
+  }
+  if (!hasRemainingFood()) {
+    onLevelComplete();
   }
 };
 
@@ -479,6 +515,11 @@ let drawWalls = () => {
 
 
 let createGhosts = () => {
+  for (let i = 0; i < ghosts.length; i++) {
+    if (ghosts[i] && typeof ghosts[i].dispose === "function") {
+      ghosts[i].dispose();
+    }
+  }
   ghosts = [];
 
   const forbidden = new Set();
@@ -518,20 +559,35 @@ startGame();
 
 /*game controls*/
 window.addEventListener("keydown", (event) => {
-    let k = event.keyCode;
-    setTimeout(() => {
-        if (k == 37 || k == 65) {
-            // left arrow or a
-            pacman.nextDirection = DIRECTION_LEFT;
-        } else if (k == 38 || k == 87) {
-            // up arrow or w
-            pacman.nextDirection = DIRECTION_UP;
-        } else if (k == 39 || k == 68) {
-            // right arrow or d
-            pacman.nextDirection = DIRECTION_RIGHT;
-        } else if (k == 40 || k == 83) {
-            // bottom arrow or s
-            pacman.nextDirection = DIRECTION_BOTTOM;
-        }
-    }, 1);
+    const key = event.key.toLowerCase();
+    let nextDirection = null;
+
+    if (key === "arrowleft" || key === "a") {
+        nextDirection = DIRECTION_LEFT;
+    } else if (key === "arrowup" || key === "w") {
+        nextDirection = DIRECTION_UP;
+    } else if (key === "arrowright" || key === "d") {
+        nextDirection = DIRECTION_RIGHT;
+    } else if (key === "arrowdown" || key === "s") {
+        nextDirection = DIRECTION_BOTTOM;
+    }
+
+    if (nextDirection !== null) {
+        event.preventDefault();
+        pacman.nextDirection = nextDirection;
+    }
+});
+
+window.addEventListener("beforeunload", () => {
+  if (gameInterval) {
+    clearInterval(gameInterval);
+  }
+  if (pacman && typeof pacman.dispose === "function") {
+    pacman.dispose();
+  }
+  for (let i = 0; i < ghosts.length; i++) {
+    if (ghosts[i] && typeof ghosts[i].dispose === "function") {
+      ghosts[i].dispose();
+    }
+  }
 });
