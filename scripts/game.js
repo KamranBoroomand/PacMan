@@ -72,6 +72,7 @@ const DIRECTION_RIGHT = 4;
 const DIRECTION_UP = 3;
 const DIRECTION_LEFT = 2;
 const DIRECTION_BOTTOM = 1;
+const SWIPE_THRESHOLD_PX = 24;
 let lives = 3;
 let ghostCount = 4;
 let ghostImageLocations = [
@@ -97,6 +98,9 @@ const FRUIT_VISIBLE_MS = 10000;
 const FRUIT_INVINCIBILITY_MS = 8000;
 const FRUIT_SCORE = 50;
 const GHOST_EAT_BASE_SCORE = 20;
+const MIN_FRUIT_SPAWN_DISTANCE = 8;
+const MIN_GHOST_RESPAWN_DISTANCE = 10;
+const MIN_GHOST_INITIAL_SPAWN_DISTANCE = 7;
 let invincibleUntil = 0;
 let ghostEatChain = 0;
 let fruit = {
@@ -106,6 +110,12 @@ let fruit = {
   expiresAt: 0,
   nextSpawnAt: Date.now() + FRUIT_SPAWN_DELAY_MS,
 };
+const touchControlsRoot = document.getElementById("touch-controls");
+const touchButtons = touchControlsRoot
+  ? Array.from(touchControlsRoot.querySelectorAll(".touch-btn[data-direction]"))
+  : [];
+let swipeStartX = null;
+let swipeStartY = null;
 
 // Legend:
 // 1 = wall, 2 = pellet, 4 = power pellet, 0 = empty path
@@ -217,6 +227,7 @@ function getRandomReachableTile(options = {}) {
     minY = 0,
     maxY = map.length - 1,
     forbidden = new Set(),
+    minDistanceFromPacman = 0,
   } = options;
 
   if (!pacman || typeof pacman.getMapX !== "function") {
@@ -265,12 +276,28 @@ function getRandomReachableTile(options = {}) {
     return !forbidden.has(key);
   });
 
-  const nonPacmanTiles = reachableTiles.filter(
+  const distanceSafePreferredTiles = preferredTiles.filter((tile) => {
+    const distance =
+      Math.abs(tile.x - startX) + Math.abs(tile.y - startY);
+    return distance >= minDistanceFromPacman;
+  });
+
+  const nonPacmanTiles = preferredTiles.filter(
     (tile) => !(tile.x === startX && tile.y === startY)
   );
+  const distanceSafeNonPacmanTiles = nonPacmanTiles.filter((tile) => {
+    const distance =
+      Math.abs(tile.x - startX) + Math.abs(tile.y - startY);
+    return distance >= minDistanceFromPacman;
+  });
+
   const candidates =
-    preferredTiles.length > 0
+    distanceSafePreferredTiles.length > 0
+      ? distanceSafePreferredTiles
+      : preferredTiles.length > 0
       ? preferredTiles
+      : distanceSafeNonPacmanTiles.length > 0
+      ? distanceSafeNonPacmanTiles
       : nonPacmanTiles.length > 0
       ? nonPacmanTiles
       : reachableTiles;
@@ -319,6 +346,7 @@ function spawnFruit() {
     minY: 1,
     maxY: map.length - 2,
     forbidden,
+    minDistanceFromPacman: MIN_FRUIT_SPAWN_DISTANCE,
   });
 
   fruit.active = true;
@@ -394,6 +422,7 @@ function respawnGhostAtRandomTile(ghostIndex) {
     minY: 1,
     maxY: map.length - 2,
     forbidden,
+    minDistanceFromPacman: MIN_GHOST_RESPAWN_DISTANCE,
   });
 
   ghost.x = tile.x * oneBlockSize;
@@ -809,7 +838,7 @@ let createGhosts = () => {
   ghosts = [];
 
   const forbidden = new Set();
-  forbidden.add(`${pacmanStart.x},${pacmanStart.y}`);
+  forbidden.add(`${pacman.getMapX()},${pacman.getMapY()}`);
 
   for (let i = 0; i < ghostCount; i++) {
     const tile = getRandomReachableTile({
@@ -818,6 +847,7 @@ let createGhosts = () => {
       minY: 1,
       maxY: map.length - 2,
       forbidden,
+      minDistanceFromPacman: MIN_GHOST_INITIAL_SPAWN_DISTANCE,
     });
 
     forbidden.add(`${tile.x},${tile.y}`);
@@ -845,25 +875,93 @@ createGhosts();
 startGame();
 
 /*game controls*/
+function setPacmanDirection(nextDirection) {
+  if (!pacman) return;
+  pacman.nextDirection = nextDirection;
+}
+
+function mapDirectionNameToCode(directionName) {
+  if (directionName === "left") return DIRECTION_LEFT;
+  if (directionName === "up") return DIRECTION_UP;
+  if (directionName === "right") return DIRECTION_RIGHT;
+  if (directionName === "down") return DIRECTION_BOTTOM;
+  return null;
+}
+
+function mapKeyboardKeyToDirection(key) {
+  if (key === "arrowleft" || key === "a") return DIRECTION_LEFT;
+  if (key === "arrowup" || key === "w") return DIRECTION_UP;
+  if (key === "arrowright" || key === "d") return DIRECTION_RIGHT;
+  if (key === "arrowdown" || key === "s") return DIRECTION_BOTTOM;
+  return null;
+}
+
+function clearSwipeState() {
+  swipeStartX = null;
+  swipeStartY = null;
+}
+
+function onCanvasTouchStart(event) {
+  if (!event.touches || event.touches.length === 0) return;
+  swipeStartX = event.touches[0].clientX;
+  swipeStartY = event.touches[0].clientY;
+}
+
+function onCanvasTouchMove(event) {
+  if (swipeStartX === null || swipeStartY === null) return;
+  event.preventDefault();
+}
+
+function onCanvasTouchEnd(event) {
+  if (swipeStartX === null || swipeStartY === null) return;
+  if (!event.changedTouches || event.changedTouches.length === 0) {
+    clearSwipeState();
+    return;
+  }
+
+  event.preventDefault();
+  const touch = event.changedTouches[0];
+  const dx = touch.clientX - swipeStartX;
+  const dy = touch.clientY - swipeStartY;
+  clearSwipeState();
+
+  if (
+    Math.abs(dx) < SWIPE_THRESHOLD_PX &&
+    Math.abs(dy) < SWIPE_THRESHOLD_PX
+  ) {
+    return;
+  }
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    setPacmanDirection(dx > 0 ? DIRECTION_RIGHT : DIRECTION_LEFT);
+  } else {
+    setPacmanDirection(dy > 0 ? DIRECTION_BOTTOM : DIRECTION_UP);
+  }
+}
+
 window.addEventListener("keydown", (event) => {
     const key = event.key.toLowerCase();
-    let nextDirection = null;
+    const nextDirection = mapKeyboardKeyToDirection(key);
+    if (nextDirection === null) return;
 
-    if (key === "arrowleft" || key === "a") {
-        nextDirection = DIRECTION_LEFT;
-    } else if (key === "arrowup" || key === "w") {
-        nextDirection = DIRECTION_UP;
-    } else if (key === "arrowright" || key === "d") {
-        nextDirection = DIRECTION_RIGHT;
-    } else if (key === "arrowdown" || key === "s") {
-        nextDirection = DIRECTION_BOTTOM;
-    }
-
-    if (nextDirection !== null) {
-        event.preventDefault();
-        pacman.nextDirection = nextDirection;
-    }
+    event.preventDefault();
+    setPacmanDirection(nextDirection);
 });
+
+for (let i = 0; i < touchButtons.length; i++) {
+  touchButtons[i].addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    const directionName = event.currentTarget.dataset.direction;
+    const nextDirection = mapDirectionNameToCode(directionName);
+    if (nextDirection === null) return;
+    setPacmanDirection(nextDirection);
+  });
+}
+
+canvas.addEventListener("touchstart", onCanvasTouchStart, { passive: true });
+canvas.addEventListener("touchmove", onCanvasTouchMove, { passive: false });
+canvas.addEventListener("touchend", onCanvasTouchEnd, { passive: false });
+canvas.addEventListener("touchcancel", clearSwipeState, { passive: true });
 
 window.addEventListener("beforeunload", () => {
   if (gameInterval) {
