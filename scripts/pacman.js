@@ -155,6 +155,24 @@ class Pacman {
 
     changeDirectionIfPossible() {
         if (this.direction == this.nextDirection) return;
+
+        const isHorizontal = (direction) =>
+            direction === DIRECTION_LEFT || direction === DIRECTION_RIGHT;
+        const currentHorizontal = isHorizontal(this.direction);
+        const nextHorizontal = isHorizontal(this.nextDirection);
+
+        if (currentHorizontal !== nextHorizontal) {
+            if (nextHorizontal) {
+                const snappedY = this.snapCoordinateToGrid(this.y);
+                if (snappedY === null) return;
+                this.y = snappedY;
+            } else {
+                const snappedX = this.snapCoordinateToGrid(this.x);
+                if (snappedX === null) return;
+                this.x = snappedX;
+            }
+        }
+
         let tempDirection = this.direction;
         this.direction = this.nextDirection;
         this.moveForwards();
@@ -164,6 +182,18 @@ class Pacman {
         } else {
             this.moveBackwards();
         }
+    }
+
+    snapCoordinateToGrid(value) {
+        const nearestGridLine = Math.round(value / oneBlockSize) * oneBlockSize;
+        const distance = Math.abs(nearestGridLine - value);
+        const maxSnapDistance = Math.max(this.speed * 1.25, 1);
+
+        if (distance > maxSnapDistance) {
+            return null;
+        }
+
+        return nearestGridLine;
     }
 
     getMapX() {

@@ -475,7 +475,9 @@ function resizeCanvasToFitViewport() {
 
   const padding = 24;
   const header = document.querySelector(".site-header");
-  const headerGuess = header ? header.offsetHeight + 24 : 220;
+  const headerGuess = header
+    ? Math.min(header.offsetHeight + 10, 110)
+    : 90;
   const availW = Math.max(320, window.innerWidth - padding);
   const availH = Math.max(320, window.innerHeight - headerGuess);
 
@@ -491,6 +493,11 @@ function resizeCanvasToFitViewport() {
   canvas.height = Math.floor(cssH * dpr);
   canvasContext.setTransform(dpr * renderScale, 0, 0, dpr * renderScale, 0, 0);
   canvasContext.imageSmoothingEnabled = false;
+}
+
+function quantizeSpeed(rawSpeed) {
+  const safe = Math.max(0.5, Number(rawSpeed) || 0.5);
+  return Math.round(safe * 4) / 4;
 }
 
 function rebuildMapCaches() {
@@ -1070,8 +1077,8 @@ function eatCollidingGhosts(indices) {
 }
 
 function createNewPacman() {
-  const baseSpeed = oneBlockSize / 10;
-  const speed = baseSpeed * currentLevelTuning.pacmanSpeedMultiplier;
+  const baseSpeed = oneBlockSize / 12.5;
+  const speed = quantizeSpeed(baseSpeed * currentLevelTuning.pacmanSpeedMultiplier);
 
   pacman = new Pacman(
     pacmanStart.x * oneBlockSize,
@@ -1099,7 +1106,7 @@ function createGhosts() {
       spawnPixel.y,
       oneBlockSize,
       oneBlockSize,
-      (pacman.speed * 0.82) * currentLevelTuning.ghostSpeedMultiplier,
+      quantizeSpeed((pacman.speed * 0.78) * currentLevelTuning.ghostSpeedMultiplier),
       ghostImageLocations[def.spriteIndex].x,
       ghostImageLocations[def.spriteIndex].y,
       124,

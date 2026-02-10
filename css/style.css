@@ -19,31 +19,30 @@ body {
     align-items: center;
     flex-direction: column;
     color: #fff;
-    padding-top: 22px;
-    gap: 10px;
+    padding-top: 8px;
+    gap: 8px;
     overscroll-behavior: none;
 }
 
 .site-header {
     width: 100%;
-    max-width: 1200px;
+    max-width: 980px;
     text-align: center;
-    padding: 12px 18px 8px;
+    padding: 6px 12px 4px;
 }
 
 .brand {
     font-family: "Press Start 2P", "Montserrat", sans-serif;
-    font-size: clamp(20px, 4vw, 34px);
-    letter-spacing: 0.16em;
+    font-size: clamp(15px, 2.6vw, 26px);
+    letter-spacing: 0.13em;
     text-transform: uppercase;
     color: #ffde00;
     text-shadow:
-        2px 2px 0 #000,
-        -2px 2px 0 #000,
-        0 0 12px rgba(255, 222, 0, 0.8),
-        0 0 24px rgba(255, 170, 0, 0.6);
+        1px 1px 0 #000,
+        -1px 1px 0 #000,
+        0 0 8px rgba(255, 222, 0, 0.75);
     display: inline-block;
-    padding: 12px 18px;
+    padding: 8px 12px;
     border-radius: 12px;
     border: 2px solid rgba(255, 222, 0, 0.5);
     background: rgba(10, 10, 10, 0.65);
@@ -53,12 +52,12 @@ body {
 }
 
 .brand-tagline {
-    margin-top: 12px;
-    font-size: clamp(12px, 2vw, 16px);
-    letter-spacing: 0.1em;
+    margin-top: 6px;
+    font-size: clamp(10px, 1.35vw, 13px);
+    letter-spacing: 0.08em;
     color: #f2f2f2;
     text-transform: uppercase;
-    opacity: 0.92;
+    opacity: 0.78;
     text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
@@ -91,7 +90,7 @@ body {
 }
 
 .github-cta {
-    margin-top: 10px;
+    margin-top: 6px;
     display: inline-flex;
     align-items: center;
     gap: 10px;
@@ -100,13 +99,13 @@ body {
 
 .github-text {
     font-family: "Montserrat", Arial, sans-serif;
-    font-size: 14px;
+    font-size: 12px;
     letter-spacing: 0.05em;
     color: #e6e6e6;
 }
 
 .game-actions {
-    margin-top: 14px;
+    margin-top: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -124,10 +123,10 @@ body {
     background: rgba(12, 18, 30, 0.9);
     color: #ffde00;
     font-family: "Press Start 2P", "Montserrat", sans-serif;
-    font-size: 11px;
+    font-size: 10px;
     line-height: 1.1;
     padding: 10px 12px;
-    min-width: 128px;
+    min-width: 110px;
     cursor: pointer;
     box-shadow:
         inset 0 0 8px rgba(255, 222, 0, 0.18),
@@ -154,8 +153,8 @@ body {
 }
 
 .settings-panel {
-    margin-top: 12px;
-    width: min(920px, 100%);
+    margin-top: 8px;
+    width: min(900px, calc(100% - 18px));
     border: 2px solid rgba(255, 222, 0, 0.32);
     border-radius: 12px;
     background: rgba(8, 12, 20, 0.85);
@@ -355,11 +354,11 @@ body {
 
 @media (max-width: 640px) {
     body {
-        padding-top: 12px;
+        padding-top: 8px;
     }
 
     .site-header {
-        padding: 8px 12px 6px;
+        padding: 4px 10px 2px;
     }
 
     .brand-tagline {

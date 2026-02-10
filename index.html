@@ -44,38 +44,6 @@
         <button id="install-app" class="action-btn hidden" type="button">Install App</button>
       </div>
 
-      <details class="settings-panel" id="settings-panel">
-        <summary>Settings</summary>
-        <div class="settings-grid">
-          <label class="settings-item" for="volume-control">
-            <span>Volume</span>
-            <input id="volume-control" type="range" min="0" max="100" step="1" value="70" />
-          </label>
-
-          <label class="settings-item" for="mobile-input-mode">
-            <span>Mobile Input</span>
-            <select id="mobile-input-mode">
-              <option value="buttons">Buttons</option>
-              <option value="stick">Virtual Stick</option>
-            </select>
-          </label>
-
-          <div class="settings-item keybinds" aria-label="Key bindings">
-            <span>Keybinds</span>
-            <div class="keybind-grid">
-              <button type="button" class="keybind-btn" data-action="left">Left: A</button>
-              <button type="button" class="keybind-btn" data-action="up">Up: W</button>
-              <button type="button" class="keybind-btn" data-action="right">Right: D</button>
-              <button type="button" class="keybind-btn" data-action="down">Down: S</button>
-              <button type="button" class="keybind-btn" data-action="pause">Pause: P</button>
-              <button type="button" class="keybind-btn" data-action="restart">Restart: R</button>
-              <button type="button" class="keybind-btn" data-action="mute">Mute: M</button>
-              <button type="button" class="keybind-btn" data-action="start">Start: Enter</button>
-            </div>
-            <p id="keybind-help" class="settings-help">Click a keybind, then press a key.</p>
-          </div>
-        </div>
-      </details>
     </header>
  
    <div id="container">
@@ -104,6 +72,39 @@
        </div>
      </div>
  </div>
+
+ <details class="settings-panel" id="settings-panel">
+   <summary>Settings</summary>
+   <div class="settings-grid">
+     <label class="settings-item" for="volume-control">
+       <span>Volume</span>
+       <input id="volume-control" type="range" min="0" max="100" step="1" value="70" />
+     </label>
+
+     <label class="settings-item" for="mobile-input-mode">
+       <span>Mobile Input</span>
+       <select id="mobile-input-mode">
+         <option value="buttons">Buttons</option>
+         <option value="stick">Virtual Stick</option>
+       </select>
+     </label>
+
+     <div class="settings-item keybinds" aria-label="Key bindings">
+       <span>Keybinds</span>
+       <div class="keybind-grid">
+         <button type="button" class="keybind-btn" data-action="left">Left: A</button>
+         <button type="button" class="keybind-btn" data-action="up">Up: W</button>
+         <button type="button" class="keybind-btn" data-action="right">Right: D</button>
+         <button type="button" class="keybind-btn" data-action="down">Down: S</button>
+         <button type="button" class="keybind-btn" data-action="pause">Pause: P</button>
+         <button type="button" class="keybind-btn" data-action="restart">Restart: R</button>
+         <button type="button" class="keybind-btn" data-action="mute">Mute: M</button>
+         <button type="button" class="keybind-btn" data-action="start">Start: Enter</button>
+       </div>
+       <p id="keybind-help" class="settings-help">Click a keybind, then press a key.</p>
+     </div>
+   </div>
+ </details>
  
   <!-- Scripts -->
 <script src="scripts/gameplay-utils.js" defer></script>
