@@ -140,8 +140,20 @@ class Ghost {
             typeof getGhostHouseExitTargetForPersonality === "function"
                 ? getGhostHouseExitTargetForPersonality(this.personality)
                 : getGhostHouseExitTarget();
-        this.x = exitTarget.x;
-        this.y = exitTarget.y;
+        const exitTileX = parseInt(exitTarget.x / oneBlockSize, 10);
+        const exitTileY = parseInt(exitTarget.y / oneBlockSize, 10);
+
+        let safeTarget = exitTarget;
+        if (!this.isWalkableTile(exitTileX, exitTileY, map)) {
+            const fallbackTarget =
+                typeof getGhostHouseExitTarget === "function"
+                    ? getGhostHouseExitTarget()
+                    : { x: this.spawnX, y: this.spawnY };
+            safeTarget = fallbackTarget;
+        }
+
+        this.x = safeTarget.x;
+        this.y = safeTarget.y;
         this.direction = DIRECTION_UP;
         this.setInHouse(false);
     }
@@ -362,6 +374,23 @@ class Ghost {
         if (this.checkCollisions()) {
             this.moveBackwards();
             this.direction = tempDirection;
+
+            this.moveForwards();
+            if (this.checkCollisions()) {
+                this.moveBackwards();
+                const oppositeDirection = this.getOppositeDirection(tempDirection);
+                this.direction = oppositeDirection;
+
+                this.moveForwards();
+                if (this.checkCollisions()) {
+                    this.moveBackwards();
+                    this.direction = tempDirection;
+                } else {
+                    this.moveBackwards();
+                }
+            } else {
+                this.moveBackwards();
+            }
         } else {
             this.moveBackwards();
         }
@@ -379,84 +408,219 @@ class Ghost {
         return nearestGridLine;
     }
 
-    calculateNewDirection(currentMap, destX, destY) {
-        const mapCopy = [];
-        for (let i = 0; i < currentMap.length; i++) {
-            mapCopy[i] = currentMap[i].slice();
-        }
-
-        const queue = [
-            {
-                x: this.getMapX(),
-                y: this.getMapY(),
-                moves: [],
-            },
-        ];
-
-        while (queue.length > 0) {
-            const node = queue.shift();
-            if (!node) continue;
-
-            if (node.x === destX && node.y === destY) {
-                return node.moves[0];
-            }
-
-            mapCopy[node.y][node.x] = 1;
-            const neighbors = this.addNeighbors(node, mapCopy);
-            for (let i = 0; i < neighbors.length; i++) {
-                queue.push(neighbors[i]);
-            }
-        }
-
-        return DIRECTION_BOTTOM;
+    getOppositeDirection(direction) {
+        if (direction === DIRECTION_RIGHT) return DIRECTION_LEFT;
+        if (direction === DIRECTION_LEFT) return DIRECTION_RIGHT;
+        if (direction === DIRECTION_UP) return DIRECTION_BOTTOM;
+        return DIRECTION_UP;
     }
 
-    addNeighbors(node, mapCopy) {
-        const queue = [];
-        const numRows = mapCopy.length;
-        const numColumns = mapCopy[0].length;
+    getDirectionVector(direction) {
+        if (direction === DIRECTION_RIGHT) return { x: 1, y: 0 };
+        if (direction === DIRECTION_LEFT) return { x: -1, y: 0 };
+        if (direction === DIRECTION_UP) return { x: 0, y: -1 };
+        return { x: 0, y: 1 };
+    }
 
-        if (
-            node.x - 1 >= 0 &&
-            node.x - 1 < numColumns &&
-            mapCopy[node.y][node.x - 1] !== 1
-        ) {
-            const leftMoves = node.moves.slice();
-            leftMoves.push(DIRECTION_LEFT);
-            queue.push({ x: node.x - 1, y: node.y, moves: leftMoves });
+    getDirectionPriority(direction) {
+        const defaultOrder = [
+            DIRECTION_UP,
+            DIRECTION_LEFT,
+            DIRECTION_BOTTOM,
+            DIRECTION_RIGHT,
+        ];
+        const personalityOrderByGhost = {
+            blinky: defaultOrder,
+            pinky: [
+                DIRECTION_LEFT,
+                DIRECTION_UP,
+                DIRECTION_RIGHT,
+                DIRECTION_BOTTOM,
+            ],
+            inky: [
+                DIRECTION_BOTTOM,
+                DIRECTION_RIGHT,
+                DIRECTION_UP,
+                DIRECTION_LEFT,
+            ],
+            clyde: [
+                DIRECTION_BOTTOM,
+                DIRECTION_LEFT,
+                DIRECTION_RIGHT,
+                DIRECTION_UP,
+            ],
+        };
+
+        const order =
+            personalityOrderByGhost[this.personality] || defaultOrder;
+        const priority = order.indexOf(direction);
+        return priority === -1 ? defaultOrder.length : priority;
+    }
+
+    getCurrentCenterTile() {
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        return {
+            x: Math.floor(centerX / oneBlockSize),
+            y: Math.floor(centerY / oneBlockSize),
+        };
+    }
+
+    normalizeHorizontalTunnelTile(tileX, tileY, currentMap) {
+        const numColumns = currentMap[0].length;
+        if (tileX >= 0 && tileX < numColumns) {
+            return tileX;
         }
 
-        if (
-            node.x + 1 >= 0 &&
-            node.x + 1 < numColumns &&
-            mapCopy[node.y][node.x + 1] !== 1
-        ) {
-            const rightMoves = node.moves.slice();
-            rightMoves.push(DIRECTION_RIGHT);
-            queue.push({ x: node.x + 1, y: node.y, moves: rightMoves });
+        if (tileY < 0 || tileY >= currentMap.length) {
+            return tileX;
         }
 
-        if (
-            node.y - 1 >= 0 &&
-            node.y - 1 < numRows &&
-            mapCopy[node.y - 1][node.x] !== 1
-        ) {
-            const upMoves = node.moves.slice();
-            upMoves.push(DIRECTION_UP);
-            queue.push({ x: node.x, y: node.y - 1, moves: upMoves });
+        const isTunnelRow =
+            currentMap[tileY][0] !== 1 && currentMap[tileY][numColumns - 1] !== 1;
+        if (!isTunnelRow) {
+            return tileX;
         }
 
-        if (
-            node.y + 1 >= 0 &&
-            node.y + 1 < numRows &&
-            mapCopy[node.y + 1][node.x] !== 1
-        ) {
-            const downMoves = node.moves.slice();
-            downMoves.push(DIRECTION_BOTTOM);
-            queue.push({ x: node.x, y: node.y + 1, moves: downMoves });
+        return tileX < 0 ? numColumns - 1 : 0;
+    }
+
+    getNeighborTile(tileX, tileY, direction, currentMap) {
+        const vector = this.getDirectionVector(direction);
+        let nextX = tileX + vector.x;
+        let nextY = tileY + vector.y;
+
+        if (vector.y === 0) {
+            nextX = this.normalizeHorizontalTunnelTile(nextX, tileY, currentMap);
         }
 
-        return queue;
+        if (nextY < 0 || nextY >= currentMap.length) {
+            return null;
+        }
+
+        if (nextX < 0 || nextX >= currentMap[0].length) {
+            return null;
+        }
+
+        return { x: nextX, y: nextY };
+    }
+
+    isWalkableTile(tileX, tileY, currentMap) {
+        if (tileY < 0 || tileY >= currentMap.length) return false;
+        if (tileX < 0 || tileX >= currentMap[0].length) return false;
+        return currentMap[tileY][tileX] !== 1;
+    }
+
+    getAvailableDirections(tileX, tileY, currentMap) {
+        const directions = [
+            DIRECTION_UP,
+            DIRECTION_LEFT,
+            DIRECTION_BOTTOM,
+            DIRECTION_RIGHT,
+        ];
+        const available = [];
+
+        for (let i = 0; i < directions.length; i++) {
+            const direction = directions[i];
+            const neighbor = this.getNeighborTile(tileX, tileY, direction, currentMap);
+            if (!neighbor) continue;
+            if (this.isWalkableTile(neighbor.x, neighbor.y, currentMap)) {
+                available.push(direction);
+            }
+        }
+
+        return available;
+    }
+
+    pickRandomDirection(candidates) {
+        if (!Array.isArray(candidates) || candidates.length === 0) {
+            return this.direction;
+        }
+
+        if (candidates.length === 1) {
+            return candidates[0];
+        }
+
+        const index = Math.floor(Math.random() * candidates.length);
+        return candidates[index];
+    }
+
+    pickDirectionClosestToTarget(candidates, originTile, targetTile, currentMap) {
+        if (!Array.isArray(candidates) || candidates.length === 0) {
+            return this.direction;
+        }
+
+        let bestDirection = candidates[0];
+        let bestScore = Infinity;
+        const currentDirection = this.direction;
+
+        for (let i = 0; i < candidates.length; i++) {
+            const direction = candidates[i];
+            const neighbor = this.getNeighborTile(
+                originTile.x,
+                originTile.y,
+                direction,
+                currentMap
+            );
+            if (!neighbor) continue;
+
+            const dx = targetTile.x - neighbor.x;
+            const dy = targetTile.y - neighbor.y;
+            let score = dx * dx + dy * dy;
+
+            if (direction === currentDirection) {
+                score -= 0.08;
+            }
+
+            if (
+                score < bestScore ||
+                (score === bestScore &&
+                    this.getDirectionPriority(direction) <
+                        this.getDirectionPriority(bestDirection))
+            ) {
+                bestScore = score;
+                bestDirection = direction;
+            }
+        }
+
+        return bestDirection;
+    }
+
+    calculateNewDirection(currentMap, destX, destY) {
+        const originTile = this.getCurrentCenterTile();
+        const targetTile = { x: destX, y: destY };
+        const availableDirections = this.getAvailableDirections(
+            originTile.x,
+            originTile.y,
+            currentMap
+        );
+
+        if (availableDirections.length === 0) {
+            return this.direction;
+        }
+
+        const reverseDirection = this.getOppositeDirection(this.direction);
+        let candidates = availableDirections;
+
+        if (candidates.length > 1) {
+            const nonReverse = candidates.filter(
+                (direction) => direction !== reverseDirection
+            );
+            if (nonReverse.length > 0) {
+                candidates = nonReverse;
+            }
+        }
+
+        if (this.isFrightened() && !this.isEaten()) {
+            return this.pickRandomDirection(candidates);
+        }
+
+        return this.pickDirectionClosestToTarget(
+            candidates,
+            originTile,
+            targetTile,
+            currentMap
+        );
     }
 
     getMapX() {

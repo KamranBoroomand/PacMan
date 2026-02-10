@@ -53,9 +53,9 @@ const GHOST_HOME_TILE = { x: 13, y: 13 };
 const GHOST_HOUSE_EXIT_TILE = { x: 13, y: 12 };
 const GHOST_HOUSE_EXIT_BY_PERSONALITY = {
   blinky: { x: 13, y: 11 },
-  pinky: { x: 12, y: 12 },
+  pinky: { x: 13, y: 12 },
   inky: { x: 13, y: 12 },
-  clyde: { x: 14, y: 12 },
+  clyde: { x: 13, y: 12 },
 };
 const BASE_AUDIO_GAIN = 0.25;
 const GHOST_MODE_SCHEDULE = [
