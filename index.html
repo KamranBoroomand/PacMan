@@ -32,6 +32,12 @@
           <span>GitHub</span>
         </a>
       </div>
+
+      <div class="game-actions" aria-label="Game controls">
+        <button id="pause-toggle" class="action-btn" type="button" aria-pressed="false">Pause</button>
+        <button id="restart-game" class="action-btn" type="button">Restart</button>
+        <button id="mute-toggle" class="action-btn" type="button" aria-pressed="false">Sound: On</button>
+      </div>
     </header>
  
    <div id="container">
@@ -52,12 +58,13 @@
          </div>
        </div>
      </div>
-   </div>
+ </div>
  
-   <!-- Scripts -->
- <script src="scripts/pacman.js" defer></script>
- <script src="scripts/ghost.js" defer></script>
- <script src="scripts/game.js" defer></script>
+  <!-- Scripts -->
+<script src="scripts/gameplay-utils.js" defer></script>
+<script src="scripts/pacman.js" defer></script>
+<script src="scripts/ghost.js" defer></script>
+<script src="scripts/game.js" defer></script>
  
  </body>
  </html>

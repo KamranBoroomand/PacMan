@@ -32,18 +32,37 @@ class Pacman {
     }
 
     eat() {
+        const eatResult = {
+            atePellet: false,
+            atePowerPellet: false,
+        };
+
         const mapX = this.getMapX();
         const mapY = this.getMapY();
 
         if (mapY < 0 || mapY >= map.length || mapX < 0 || mapX >= map[0].length) {
-            return;
+            return eatResult;
         }
 
         if (map[mapY][mapX] === 2 || map[mapY][mapX] === 4) {
             const isPowerPellet = map[mapY][mapX] === 4;
             map[mapY][mapX] = 0;
-            score += isPowerPellet ? 5 : 1;
+            const points = isPowerPellet ? 5 : 1;
+            if (typeof addScore === "function") {
+                addScore(points);
+            } else {
+                score += points;
+            }
+
+            if (!isPowerPellet && typeof playGameSfx === "function") {
+                playGameSfx("pellet");
+            }
+
+            eatResult.atePellet = true;
+            eatResult.atePowerPellet = isPowerPellet;
         }
+
+        return eatResult;
     }
 
     handleTunnelWrap() {
