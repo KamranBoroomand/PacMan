@@ -186,8 +186,8 @@
 
     return {
       level: safeLevel,
-      pacmanSpeedMultiplier: 1 + (clampedLevel - 1) * 0.03,
-      ghostSpeedMultiplier: 1 + (clampedLevel - 1) * 0.04,
+      pacmanSpeedMultiplier: 1 + (clampedLevel - 1) * 0.015,
+      ghostSpeedMultiplier: 1 + (clampedLevel - 1) * 0.018,
       frightenedDurationMs: Math.max(2400, 7000 - (safeLevel - 1) * 380),
       fruitSpawnDelayMs: Math.max(5000, 12000 - (safeLevel - 1) * 350),
       fruitVisibleMs: Math.max(4200, 10000 - (safeLevel - 1) * 220),

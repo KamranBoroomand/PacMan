@@ -49,8 +49,8 @@ const MIN_FRUIT_SPAWN_DISTANCE = 8;
 const MIN_GHOST_INITIAL_SPAWN_DISTANCE = 7;
 const SETTINGS_STORAGE_KEY = "pacman.settings.v1";
 const HIGH_SCORE_STORAGE_KEY = "pacman.highScore";
-const GHOST_HOME_TILE = { x: 13, y: 17 };
-const GHOST_HOUSE_EXIT_TILE = { x: 13, y: 14 };
+const GHOST_HOME_TILE = { x: 13, y: 13 };
+const GHOST_HOUSE_EXIT_TILE = { x: 13, y: 12 };
 const BASE_AUDIO_GAIN = 0.25;
 const GHOST_MODE_SCHEDULE = [
   { mode: "scatter", durationMs: 7000 },
@@ -80,9 +80,9 @@ const GHOST_DEFINITIONS = [
     spriteIndex: 1,
     scatterTile: { x: 1, y: 1 },
     startInHouse: true,
-    releaseDotThreshold: 0,
-    forceReleaseMs: 2500,
-    spawnTile: { x: 12, y: 14 },
+    releaseDotThreshold: 4,
+    forceReleaseMs: 1200,
+    spawnTile: { x: 12, y: 13 },
   },
   {
     id: "inky",
@@ -90,9 +90,9 @@ const GHOST_DEFINITIONS = [
     spriteIndex: 2,
     scatterTile: { x: 26, y: 29 },
     startInHouse: true,
-    releaseDotThreshold: 30,
-    forceReleaseMs: 6500,
-    spawnTile: { x: 13, y: 14 },
+    releaseDotThreshold: 14,
+    forceReleaseMs: 3500,
+    spawnTile: { x: 13, y: 13 },
   },
   {
     id: "clyde",
@@ -100,9 +100,9 @@ const GHOST_DEFINITIONS = [
     spriteIndex: 3,
     scatterTile: { x: 1, y: 29 },
     startInHouse: true,
-    releaseDotThreshold: 60,
-    forceReleaseMs: 10000,
-    spawnTile: { x: 14, y: 14 },
+    releaseDotThreshold: 28,
+    forceReleaseMs: 6000,
+    spawnTile: { x: 14, y: 13 },
   },
 ];
 
@@ -766,8 +766,8 @@ function getLevelTuning(levelNumber) {
   const safeLevel = Math.max(1, levelNumber);
   return {
     level: safeLevel,
-    pacmanSpeedMultiplier: 1 + (safeLevel - 1) * 0.03,
-    ghostSpeedMultiplier: 1 + (safeLevel - 1) * 0.04,
+    pacmanSpeedMultiplier: 1 + (safeLevel - 1) * 0.015,
+    ghostSpeedMultiplier: 1 + (safeLevel - 1) * 0.018,
     frightenedDurationMs: Math.max(2400, 7000 - (safeLevel - 1) * 380),
     fruitSpawnDelayMs: Math.max(5000, 12000 - (safeLevel - 1) * 350),
     fruitVisibleMs: Math.max(4200, 10000 - (safeLevel - 1) * 220),
@@ -1070,7 +1070,7 @@ function eatCollidingGhosts(indices) {
 }
 
 function createNewPacman() {
-  const baseSpeed = oneBlockSize / 5;
+  const baseSpeed = oneBlockSize / 10;
   const speed = baseSpeed * currentLevelTuning.pacmanSpeedMultiplier;
 
   pacman = new Pacman(
@@ -1099,7 +1099,7 @@ function createGhosts() {
       spawnPixel.y,
       oneBlockSize,
       oneBlockSize,
-      (pacman.speed * 0.9) * currentLevelTuning.ghostSpeedMultiplier,
+      (pacman.speed * 0.82) * currentLevelTuning.ghostSpeedMultiplier,
       ghostImageLocations[def.spriteIndex].x,
       ghostImageLocations[def.spriteIndex].y,
       124,
