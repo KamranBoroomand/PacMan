@@ -128,12 +128,18 @@ class Ghost {
     }
 
     releaseFromHouse() {
-        if (typeof getGhostHouseExitTarget !== "function") {
+        if (
+            typeof getGhostHouseExitTargetForPersonality !== "function" &&
+            typeof getGhostHouseExitTarget !== "function"
+        ) {
             this.setInHouse(false);
             return;
         }
 
-        const exitTarget = getGhostHouseExitTarget();
+        const exitTarget =
+            typeof getGhostHouseExitTargetForPersonality === "function"
+                ? getGhostHouseExitTargetForPersonality(this.personality)
+                : getGhostHouseExitTarget();
         this.x = exitTarget.x;
         this.y = exitTarget.y;
         this.direction = DIRECTION_UP;
@@ -316,16 +322,41 @@ class Ghost {
 
     changeDirectionIfPossible() {
         const tempDirection = this.direction;
-        this.direction = this.calculateNewDirection(
+        let nextDirection = this.calculateNewDirection(
             map,
             parseInt(this.target.x / oneBlockSize, 10),
             parseInt(this.target.y / oneBlockSize, 10)
         );
 
-        if (typeof this.direction === "undefined") {
+        if (typeof nextDirection === "undefined") {
             this.direction = tempDirection;
             return;
         }
+
+        const isHorizontal = (direction) =>
+            direction === DIRECTION_LEFT || direction === DIRECTION_RIGHT;
+        const currentHorizontal = isHorizontal(tempDirection);
+        const nextHorizontal = isHorizontal(nextDirection);
+
+        if (currentHorizontal !== nextHorizontal) {
+            if (nextHorizontal) {
+                const snappedY = this.snapCoordinateToGrid(this.y);
+                if (snappedY === null) {
+                    nextDirection = tempDirection;
+                } else {
+                    this.y = snappedY;
+                }
+            } else {
+                const snappedX = this.snapCoordinateToGrid(this.x);
+                if (snappedX === null) {
+                    nextDirection = tempDirection;
+                } else {
+                    this.x = snappedX;
+                }
+            }
+        }
+
+        this.direction = nextDirection;
 
         this.moveForwards();
         if (this.checkCollisions()) {
@@ -334,6 +365,18 @@ class Ghost {
         } else {
             this.moveBackwards();
         }
+    }
+
+    snapCoordinateToGrid(value) {
+        const nearestGridLine = Math.round(value / oneBlockSize) * oneBlockSize;
+        const distance = Math.abs(nearestGridLine - value);
+        const maxSnapDistance = Math.max(this.speed * 1.25, 1);
+
+        if (distance > maxSnapDistance) {
+            return null;
+        }
+
+        return nearestGridLine;
     }
 
     calculateNewDirection(currentMap, destX, destY) {

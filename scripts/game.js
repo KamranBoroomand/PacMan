@@ -51,6 +51,12 @@ const SETTINGS_STORAGE_KEY = "pacman.settings.v1";
 const HIGH_SCORE_STORAGE_KEY = "pacman.highScore";
 const GHOST_HOME_TILE = { x: 13, y: 13 };
 const GHOST_HOUSE_EXIT_TILE = { x: 13, y: 12 };
+const GHOST_HOUSE_EXIT_BY_PERSONALITY = {
+  blinky: { x: 13, y: 11 },
+  pinky: { x: 12, y: 12 },
+  inky: { x: 13, y: 12 },
+  clyde: { x: 14, y: 12 },
+};
 const BASE_AUDIO_GAIN = 0.25;
 const GHOST_MODE_SCHEDULE = [
   { mode: "scatter", durationMs: 7000 },
@@ -80,8 +86,8 @@ const GHOST_DEFINITIONS = [
     spriteIndex: 1,
     scatterTile: { x: 1, y: 1 },
     startInHouse: true,
-    releaseDotThreshold: 4,
-    forceReleaseMs: 1200,
+    releaseDotThreshold: 0,
+    forceReleaseMs: 900,
     spawnTile: { x: 12, y: 13 },
   },
   {
@@ -90,8 +96,8 @@ const GHOST_DEFINITIONS = [
     spriteIndex: 2,
     scatterTile: { x: 26, y: 29 },
     startInHouse: true,
-    releaseDotThreshold: 14,
-    forceReleaseMs: 3500,
+    releaseDotThreshold: 8,
+    forceReleaseMs: 2400,
     spawnTile: { x: 13, y: 13 },
   },
   {
@@ -100,8 +106,8 @@ const GHOST_DEFINITIONS = [
     spriteIndex: 3,
     scatterTile: { x: 1, y: 29 },
     startInHouse: true,
-    releaseDotThreshold: 28,
-    forceReleaseMs: 6000,
+    releaseDotThreshold: 18,
+    forceReleaseMs: 4200,
     spawnTile: { x: 14, y: 13 },
   },
 ];
@@ -497,7 +503,7 @@ function resizeCanvasToFitViewport() {
 
 function quantizeSpeed(rawSpeed) {
   const safe = Math.max(0.5, Number(rawSpeed) || 0.5);
-  return Math.round(safe * 4) / 4;
+  return Math.round(safe * 20) / 20;
 }
 
 function rebuildMapCaches() {
@@ -832,6 +838,20 @@ function getGhostHouseExitTarget() {
   return tileToPixel(GHOST_HOUSE_EXIT_TILE);
 }
 
+function getGhostHouseExitTargetForPersonality(personality) {
+  if (
+    personality &&
+    Object.prototype.hasOwnProperty.call(
+      GHOST_HOUSE_EXIT_BY_PERSONALITY,
+      personality
+    )
+  ) {
+    return tileToPixel(GHOST_HOUSE_EXIT_BY_PERSONALITY[personality]);
+  }
+
+  return getGhostHouseExitTarget();
+}
+
 function getGhostHomeTarget() {
   return tileToPixel(GHOST_HOME_TILE);
 }
@@ -842,15 +862,17 @@ function canReleaseGhostFromHouse(ghost) {
   const utils = getGameplayUtils();
   const elapsed = Math.max(0, lastUpdateNow - roundStartAt);
   if (utils && typeof utils.shouldReleaseGhostFromHouse === "function") {
-    return utils.shouldReleaseGhostFromHouse({
+    const shouldRelease = utils.shouldReleaseGhostFromHouse({
       dotsEatenThisRound,
       releaseDotThreshold: ghost.houseState.releaseDotThreshold,
       elapsedMs: elapsed,
       forceReleaseMs: ghost.houseState.forceReleaseMs,
     });
+    if (shouldRelease) return true;
+    return elapsed >= 12000;
   }
 
-  return (
+  return elapsed >= 12000 || (
     dotsEatenThisRound >= ghost.houseState.releaseDotThreshold ||
     elapsed >= ghost.houseState.forceReleaseMs
   );
@@ -1077,7 +1099,7 @@ function eatCollidingGhosts(indices) {
 }
 
 function createNewPacman() {
-  const baseSpeed = oneBlockSize / 12.5;
+  const baseSpeed = oneBlockSize / 16;
   const speed = quantizeSpeed(baseSpeed * currentLevelTuning.pacmanSpeedMultiplier);
 
   pacman = new Pacman(
@@ -1106,7 +1128,7 @@ function createGhosts() {
       spawnPixel.y,
       oneBlockSize,
       oneBlockSize,
-      quantizeSpeed((pacman.speed * 0.78) * currentLevelTuning.ghostSpeedMultiplier),
+      quantizeSpeed((pacman.speed * 0.86) * currentLevelTuning.ghostSpeedMultiplier),
       ghostImageLocations[def.spriteIndex].x,
       ghostImageLocations[def.spriteIndex].y,
       124,
