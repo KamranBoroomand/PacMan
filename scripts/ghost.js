@@ -550,6 +550,45 @@ class Ghost {
             return this.direction;
         }
 
+        const utils =
+            typeof GameplayUtils === "object" && GameplayUtils
+                ? GameplayUtils
+                : null;
+        const directionalCandidates = [];
+
+        for (let i = 0; i < candidates.length; i++) {
+            const direction = candidates[i];
+            const neighbor = this.getNeighborTile(
+                originTile.x,
+                originTile.y,
+                direction,
+                currentMap
+            );
+            if (!neighbor) continue;
+
+            directionalCandidates.push({
+                direction,
+                x: neighbor.x,
+                y: neighbor.y,
+            });
+        }
+
+        if (
+            utils &&
+            typeof utils.pickGhostDirection === "function" &&
+            directionalCandidates.length > 0
+        ) {
+            const pickedDirection = utils.pickGhostDirection({
+                candidates: directionalCandidates,
+                targetTile,
+                currentDirection: this.direction,
+                personality: this.personality,
+            });
+            if (Number.isFinite(pickedDirection)) {
+                return pickedDirection;
+            }
+        }
+
         let bestDirection = candidates[0];
         let bestScore = Infinity;
         const currentDirection = this.direction;

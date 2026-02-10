@@ -149,3 +149,55 @@ test("updateHighScore keeps larger score", () => {
   assert.equal(gameplayUtils.updateHighScore(100, 30), 100);
   assert.equal(gameplayUtils.updateHighScore(100, 120), 120);
 });
+
+test("pickGhostDirection chooses nearest candidate tile", () => {
+  const direction = gameplayUtils.pickGhostDirection({
+    candidates: [
+      { direction: 2, x: 4, y: 8 },
+      { direction: 4, x: 11, y: 8 },
+    ],
+    targetTile: { x: 12, y: 8 },
+    currentDirection: 2,
+    personality: "blinky",
+  });
+
+  assert.equal(direction, 4);
+});
+
+test("pickGhostDirection uses personality tie-break order", () => {
+  const candidates = [
+    { direction: 3, x: 8, y: 7 },
+    { direction: 2, x: 7, y: 8 },
+  ];
+  const target = { x: 7, y: 7 };
+
+  const blinkyDirection = gameplayUtils.pickGhostDirection({
+    candidates,
+    targetTile: target,
+    currentDirection: 1,
+    personality: "blinky",
+  });
+  const pinkyDirection = gameplayUtils.pickGhostDirection({
+    candidates,
+    targetTile: target,
+    currentDirection: 1,
+    personality: "pinky",
+  });
+
+  assert.equal(blinkyDirection, 3);
+  assert.equal(pinkyDirection, 2);
+});
+
+test("pickGhostDirection prefers continuing direction on equal scores", () => {
+  const direction = gameplayUtils.pickGhostDirection({
+    candidates: [
+      { direction: 3, x: 8, y: 7 },
+      { direction: 2, x: 7, y: 8 },
+    ],
+    targetTile: { x: 7, y: 7 },
+    currentDirection: 2,
+    personality: "blinky",
+  });
+
+  assert.equal(direction, 2);
+});

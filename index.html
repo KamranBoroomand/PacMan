@@ -1,116 +1,126 @@
- <!DOCTYPE html>
- <html lang="en">
- <head>
-   <meta charset="UTF-8">
-   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-   <meta property="og:type" content="website" />
-   <meta property="og:title" content="PacMan" />
-   <meta property="og:description" content="In-browser, canvas-based Pac-Man homage. Runs fully as static assets." />
-   <meta property="og:url" content="https://pacman.kamranboroomand.ir/" />
-   <meta property="og:image" content="https://pacman.kamranboroomand.ir/images/pacman-preview.png" />
-   <meta name="twitter:card" content="summary_large_image" />
-   <meta name="twitter:title" content="PacMan" />
-   <meta name="twitter:description" content="In-browser, canvas-based Pac-Man homage. Fully static." />
-   <meta name="twitter:image" content="https://pacman.kamranboroomand.ir/images/pacman-preview.png" />
-   <meta name="theme-color" content="#000000" />
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="PacMan">
+  <meta property="og:description" content="In-browser, canvas-based Pac-Man homage. Runs fully as static assets.">
+  <meta property="og:url" content="https://pacman.kamranboroomand.ir/">
+  <meta property="og:image" content="https://pacman.kamranboroomand.ir/images/pacman-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PacMan">
+  <meta name="twitter:description" content="In-browser, canvas-based Pac-Man homage. Fully static.">
+  <meta name="twitter:image" content="https://pacman.kamranboroomand.ir/images/pacman-preview.png">
+  <meta name="theme-color" content="#08131d">
+  <title>PacMan Game</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="images/pacman favicon.png">
+  <link rel="icon" type="image/png" href="images/pacman favicon.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="bg-layer bg-stars" aria-hidden="true"></div>
+  <div class="bg-layer bg-flow" aria-hidden="true"></div>
+  <div class="bg-layer bg-radial" aria-hidden="true"></div>
 
-   <link rel="stylesheet" href="css/style.css">
-   <link rel="manifest" href="manifest.webmanifest">
-   <link rel="apple-touch-icon" href="images/pacman favicon.png">
-   <link rel="icon" type="image/png" href="images/pacman favicon.png">
-   <title>Pacman Game</title>
- </head>
- 
-  <body>
-    <header class="site-header">
-      <div class="brand">Kamran Boroomand</div>
-      <p class="brand-tagline">Vintage maze chase · modern web polish</p>
-      <div class="github-cta">
-        <span class="github-text">See the code on</span>
-        <a class="github-link" href="https://github.com/KamranBoroomand/PacMan" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.03-.02-2.03-3.2.7-3.88-1.54-3.88-1.54-.53-1.35-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.78 2.73 1.27 3.4.97.11-.76.41-1.27.74-1.56-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.28 1.19-3.08-.12-.29-.52-1.45.11-3.02 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.21-1.49 3.18-1.18 3.18-1.18.63 1.57.23 2.73.11 3.02.74.8 1.18 1.82 1.18 3.08 0 4.42-2.69 5.39-5.25 5.67.42.37.8 1.1.8 2.22 0 1.6-.02 2.89-.02 3.29 0 .31.21.67.8.56A10.99 10.99 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/>
-          </svg>
-          <span>GitHub</span>
-        </a>
+  <header class="site-header">
+    <div class="header-pill">
+      <div class="identity-block">
+        <p class="identity-kicker">1980 Classic Rewired</p>
+        <h1 class="identity-name">
+          <span class="title-main">PAC-MAN</span>
+        </h1>
+        <p class="identity-subline">Play with keyboard, gamepad, touch, or virtual stick</p>
+        <div class="header-badges" aria-label="Feature highlights">
+          <span class="header-badge">60 FPS</span>
+          <span class="header-badge">ARCADE AI</span>
+          <span class="header-badge">PWA READY</span>
+        </div>
       </div>
 
-      <div class="game-actions" aria-label="Game controls">
-        <button id="start-game" class="action-btn" type="button">Start</button>
-        <button id="pause-toggle" class="action-btn" type="button" aria-pressed="false">Pause</button>
-        <button id="restart-game" class="action-btn" type="button">Restart</button>
-        <button id="mute-toggle" class="action-btn" type="button" aria-pressed="false">Sound: On</button>
-        <button id="install-app" class="action-btn hidden" type="button">Install App</button>
+      <nav class="header-links" aria-label="Project links">
+        <a class="header-link" href="https://github.com/KamranBoroomand/PacMan" target="_blank" rel="noopener">Source</a>
+        <a class="header-link" href="https://pacman.kamranboroomand.ir/" target="_blank" rel="noopener">Production</a>
+      </nav>
+    </div>
+
+    <div class="game-actions" aria-label="Game controls">
+      <button id="start-game" class="action-btn" type="button">Start</button>
+      <button id="pause-toggle" class="action-btn" type="button" aria-pressed="false">Pause</button>
+      <button id="restart-game" class="action-btn" type="button">Restart</button>
+      <button id="mute-toggle" class="action-btn" type="button" aria-pressed="false">Sound: On</button>
+      <button id="install-app" class="action-btn hidden" type="button">Install App</button>
+    </div>
+  </header>
+
+  <main id="container" class="game-shell">
+    <section class="canvas-shell">
+      <canvas id="canvas" class="gmap"></canvas>
+
+      <div id="touch-controls" class="touch-controls" aria-label="Touch controls">
+        <button class="touch-btn touch-up" data-direction="up" aria-label="Move up" type="button">▲</button>
+        <button class="touch-btn touch-left" data-direction="left" aria-label="Move left" type="button">◀</button>
+        <button class="touch-btn touch-down" data-direction="down" aria-label="Move down" type="button">▼</button>
+        <button class="touch-btn touch-right" data-direction="right" aria-label="Move right" type="button">▶</button>
       </div>
 
-    </header>
- 
-   <div id="container">
-     <div class="row">
-       <div class="col1">
-         <canvas id="canvas" class="gmap"></canvas>
+      <div id="virtual-stick" class="virtual-stick hidden" aria-label="Virtual stick">
+        <div id="stick-base" class="stick-base">
+          <div id="stick-knob" class="stick-knob"></div>
+        </div>
+        <p class="stick-help">Drag to steer</p>
+      </div>
 
-         <div id="touch-controls" class="touch-controls" aria-label="Touch controls">
-           <button class="touch-btn touch-up" data-direction="up" aria-label="Move up" type="button">▲</button>
-           <button class="touch-btn touch-left" data-direction="left" aria-label="Move left" type="button">◀</button>
-           <button class="touch-btn touch-down" data-direction="down" aria-label="Move down" type="button">▼</button>
-           <button class="touch-btn touch-right" data-direction="right" aria-label="Move right" type="button">▶</button>
-         </div>
+      <div style="display:none;">
+        <img id="animation" src="images/animations.gif" alt="pacman sprites">
+        <img id="ghosts" src="images/ghost.png" alt="ghost sprites">
+      </div>
+    </section>
 
-         <div id="virtual-stick" class="virtual-stick hidden" aria-label="Virtual stick">
-           <div id="stick-base" class="stick-base">
-             <div id="stick-knob" class="stick-knob"></div>
-           </div>
-           <p class="stick-help">Drag stick to steer</p>
-         </div>
- 
-         <div style="display:none;">
-           <img id="animation" src="images/animations.gif" alt="pacman sprites">
-           <img id="ghosts" src="images/ghost.png" alt="ghost sprites">
-         </div>
-       </div>
-     </div>
- </div>
+    <details class="settings-panel" id="settings-panel">
+      <summary>Settings</summary>
+      <div class="settings-grid">
+        <label class="settings-item" for="volume-control">
+          <span>Volume</span>
+          <input id="volume-control" type="range" min="0" max="100" step="1" value="70" />
+        </label>
 
- <details class="settings-panel" id="settings-panel">
-   <summary>Settings</summary>
-   <div class="settings-grid">
-     <label class="settings-item" for="volume-control">
-       <span>Volume</span>
-       <input id="volume-control" type="range" min="0" max="100" step="1" value="70" />
-     </label>
+        <label class="settings-item" for="mobile-input-mode">
+          <span>Mobile Input</span>
+          <select id="mobile-input-mode">
+            <option value="buttons">Buttons</option>
+            <option value="stick">Virtual Stick</option>
+          </select>
+        </label>
 
-     <label class="settings-item" for="mobile-input-mode">
-       <span>Mobile Input</span>
-       <select id="mobile-input-mode">
-         <option value="buttons">Buttons</option>
-         <option value="stick">Virtual Stick</option>
-       </select>
-     </label>
+        <div class="settings-item keybinds" aria-label="Key bindings">
+          <span>Keybinds</span>
+          <div class="keybind-grid">
+            <button type="button" class="keybind-btn" data-action="left">Left: A</button>
+            <button type="button" class="keybind-btn" data-action="up">Up: W</button>
+            <button type="button" class="keybind-btn" data-action="right">Right: D</button>
+            <button type="button" class="keybind-btn" data-action="down">Down: S</button>
+            <button type="button" class="keybind-btn" data-action="pause">Pause: P</button>
+            <button type="button" class="keybind-btn" data-action="restart">Restart: R</button>
+            <button type="button" class="keybind-btn" data-action="mute">Mute: M</button>
+            <button type="button" class="keybind-btn" data-action="start">Start: Enter</button>
+          </div>
+          <p id="keybind-help" class="settings-help">Click a keybind, then press a key.</p>
+        </div>
+      </div>
+    </details>
+  </main>
 
-     <div class="settings-item keybinds" aria-label="Key bindings">
-       <span>Keybinds</span>
-       <div class="keybind-grid">
-         <button type="button" class="keybind-btn" data-action="left">Left: A</button>
-         <button type="button" class="keybind-btn" data-action="up">Up: W</button>
-         <button type="button" class="keybind-btn" data-action="right">Right: D</button>
-         <button type="button" class="keybind-btn" data-action="down">Down: S</button>
-         <button type="button" class="keybind-btn" data-action="pause">Pause: P</button>
-         <button type="button" class="keybind-btn" data-action="restart">Restart: R</button>
-         <button type="button" class="keybind-btn" data-action="mute">Mute: M</button>
-         <button type="button" class="keybind-btn" data-action="start">Start: Enter</button>
-       </div>
-       <p id="keybind-help" class="settings-help">Click a keybind, then press a key.</p>
-     </div>
-   </div>
- </details>
- 
-  <!-- Scripts -->
-<script src="scripts/gameplay-utils.js" defer></script>
-<script src="scripts/pacman.js" defer></script>
-<script src="scripts/ghost.js" defer></script>
-<script src="scripts/game.js" defer></script>
- 
- </body>
- </html>
+  <footer class="site-footer">
+    <p class="footer-line">PacMan · Focus-first gameplay shell</p>
+    <p class="footer-line footer-muted">Arcade motion, modern controls, and offline-ready play.</p>
+  </footer>
+
+  <script src="scripts/gameplay-utils.js" defer></script>
+  <script src="scripts/pacman.js" defer></script>
+  <script src="scripts/ghost.js" defer></script>
+  <script src="scripts/game.js" defer></script>
+</body>
+</html>

@@ -1,5 +1,9 @@
 (function initGameplayUtils(globalScope) {
   const DEFAULT_MAX_CHAIN = 6;
+  const DIRECTION_RIGHT = 4;
+  const DIRECTION_UP = 3;
+  const DIRECTION_LEFT = 2;
+  const DIRECTION_BOTTOM = 1;
   const DEFAULT_GHOST_MODE_SCHEDULE = [
     { mode: "scatter", durationMs: 7000 },
     { mode: "chase", durationMs: 20000 },
@@ -166,6 +170,85 @@
     return "chase";
   }
 
+  function getGhostDirectionPriority(direction, personality = "blinky") {
+    const defaultOrder = [
+      DIRECTION_UP,
+      DIRECTION_LEFT,
+      DIRECTION_BOTTOM,
+      DIRECTION_RIGHT,
+    ];
+    const personalityOrderByGhost = {
+      blinky: defaultOrder,
+      pinky: [
+        DIRECTION_LEFT,
+        DIRECTION_UP,
+        DIRECTION_RIGHT,
+        DIRECTION_BOTTOM,
+      ],
+      inky: [
+        DIRECTION_BOTTOM,
+        DIRECTION_RIGHT,
+        DIRECTION_UP,
+        DIRECTION_LEFT,
+      ],
+      clyde: [
+        DIRECTION_BOTTOM,
+        DIRECTION_LEFT,
+        DIRECTION_RIGHT,
+        DIRECTION_UP,
+      ],
+    };
+
+    const order = personalityOrderByGhost[personality] || defaultOrder;
+    const priority = order.indexOf(direction);
+    return priority === -1 ? defaultOrder.length : priority;
+  }
+
+  function pickGhostDirection({
+    candidates,
+    targetTile,
+    currentDirection,
+    personality,
+  }) {
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      return currentDirection;
+    }
+
+    const safeTarget = targetTile || { x: 0, y: 0 };
+    let bestCandidate = null;
+    let bestScore = Infinity;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+      if (!candidate) continue;
+      if (!Number.isFinite(candidate.direction)) continue;
+      if (!Number.isFinite(candidate.x) || !Number.isFinite(candidate.y)) continue;
+
+      const dx = safeTarget.x - candidate.x;
+      const dy = safeTarget.y - candidate.y;
+      let score = dx * dx + dy * dy;
+
+      if (candidate.direction === currentDirection) {
+        score -= 0.08;
+      }
+
+      const beatsCurrentBest =
+        score < bestScore ||
+        (
+          score === bestScore &&
+          getGhostDirectionPriority(candidate.direction, personality) <
+            getGhostDirectionPriority(bestCandidate.direction, personality)
+        );
+
+      if (!bestCandidate || beatsCurrentBest) {
+        bestCandidate = candidate;
+        bestScore = score;
+      }
+    }
+
+    return bestCandidate ? bestCandidate.direction : currentDirection;
+  }
+
   function shouldReleaseGhostFromHouse({
     dotsEatenThisRound,
     releaseDotThreshold,
@@ -236,11 +319,13 @@
     computeInkyTargetTile,
     computePinkyTargetTile,
     computeScatterChaseMode,
+    getGhostDirectionPriority,
     getLevelTuning,
     isFrightenedFlashing,
     manhattanDistance,
     nextBonusLifeMilestone,
     nextGhostEatChain,
+    pickGhostDirection,
     pickFarthestTarget,
     shouldAwardBonusLife,
     shouldReleaseGhostFromHouse,
