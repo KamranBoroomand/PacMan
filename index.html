@@ -13,8 +13,11 @@
    <meta name="twitter:title" content="PacMan" />
    <meta name="twitter:description" content="In-browser, canvas-based Pac-Man homage. Fully static." />
    <meta name="twitter:image" content="https://pacman.kamranboroomand.ir/images/pacman-preview.png" />
+   <meta name="theme-color" content="#000000" />
 
    <link rel="stylesheet" href="css/style.css">
+   <link rel="manifest" href="manifest.webmanifest">
+   <link rel="apple-touch-icon" href="images/pacman favicon.png">
    <link rel="icon" type="image/png" href="images/pacman favicon.png">
    <title>Pacman Game</title>
  </head>
@@ -34,10 +37,45 @@
       </div>
 
       <div class="game-actions" aria-label="Game controls">
+        <button id="start-game" class="action-btn" type="button">Start</button>
         <button id="pause-toggle" class="action-btn" type="button" aria-pressed="false">Pause</button>
         <button id="restart-game" class="action-btn" type="button">Restart</button>
         <button id="mute-toggle" class="action-btn" type="button" aria-pressed="false">Sound: On</button>
+        <button id="install-app" class="action-btn hidden" type="button">Install App</button>
       </div>
+
+      <details class="settings-panel" id="settings-panel">
+        <summary>Settings</summary>
+        <div class="settings-grid">
+          <label class="settings-item" for="volume-control">
+            <span>Volume</span>
+            <input id="volume-control" type="range" min="0" max="100" step="1" value="70" />
+          </label>
+
+          <label class="settings-item" for="mobile-input-mode">
+            <span>Mobile Input</span>
+            <select id="mobile-input-mode">
+              <option value="buttons">Buttons</option>
+              <option value="stick">Virtual Stick</option>
+            </select>
+          </label>
+
+          <div class="settings-item keybinds" aria-label="Key bindings">
+            <span>Keybinds</span>
+            <div class="keybind-grid">
+              <button type="button" class="keybind-btn" data-action="left">Left: A</button>
+              <button type="button" class="keybind-btn" data-action="up">Up: W</button>
+              <button type="button" class="keybind-btn" data-action="right">Right: D</button>
+              <button type="button" class="keybind-btn" data-action="down">Down: S</button>
+              <button type="button" class="keybind-btn" data-action="pause">Pause: P</button>
+              <button type="button" class="keybind-btn" data-action="restart">Restart: R</button>
+              <button type="button" class="keybind-btn" data-action="mute">Mute: M</button>
+              <button type="button" class="keybind-btn" data-action="start">Start: Enter</button>
+            </div>
+            <p id="keybind-help" class="settings-help">Click a keybind, then press a key.</p>
+          </div>
+        </div>
+      </details>
     </header>
  
    <div id="container">
@@ -50,6 +88,13 @@
            <button class="touch-btn touch-left" data-direction="left" aria-label="Move left" type="button">◀</button>
            <button class="touch-btn touch-down" data-direction="down" aria-label="Move down" type="button">▼</button>
            <button class="touch-btn touch-right" data-direction="right" aria-label="Move right" type="button">▶</button>
+         </div>
+
+         <div id="virtual-stick" class="virtual-stick hidden" aria-label="Virtual stick">
+           <div id="stick-base" class="stick-base">
+             <div id="stick-knob" class="stick-knob"></div>
+           </div>
+           <p class="stick-help">Drag stick to steer</p>
          </div>
  
          <div style="display:none;">

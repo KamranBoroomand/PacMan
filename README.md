@@ -18,8 +18,8 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 
 - No build system or backend is required.
 - The game runs entirely in the browser via a `<canvas>`.
-- Gameplay includes pellets, power pellets, frightened ghosts, score/lives/high-score HUD, and level/game-over reset behavior.
-- Desktop and mobile input are both supported (keyboard, touch buttons, and swipe), with keyboard shortcuts for pause/restart/mute.
+- Gameplay includes arcade-style ghost personalities, scatter/chase/frightened cycles, level progression, and score/lives/high-score HUD.
+- Desktop and mobile input are both supported (keyboard rebinding, touch buttons, virtual stick, and gamepad support).
 
 ![PacMan preview](images/pacman-preview.png)
 
@@ -27,13 +27,27 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - Classic maze layout (`28 x 31` tiles) with walls, pellets, and corner power pellets.
 - Responsive canvas scaling with device-pixel-ratio support for crisp rendering.
 - Pac-Man movement with wall collision checks and tunnel wrap logic.
-- Ghost AI with chase mode, frightened mode (blue/flashing visuals), and eaten-eye return-to-home behavior.
-- Power pellets trigger frightened mode with chain ghost scoring.
-- Fruit spawn system with timed visibility and score bonus.
-- In-header controls for pause/resume, restart, and sound mute.
-- Local high-score persistence via `localStorage`.
-- On-screen touch controls plus swipe gestures for mobile gameplay.
-- Lightweight SFX engine powered by Web Audio API.
+- Arcade-accurate ghost behavior with per-ghost targeting logic:
+  - Blinky (direct chase), Pinky (ambush ahead), Inky (vector-based), Clyde (distance-based scatter/chase).
+- Scatter/chase cycle schedule with frightened overrides and ghost-house release rules.
+- Level progression with per-level speed/difficulty tuning, fruit table scoring, and bonus-life milestones.
+- Full round-state flow: start screen, ready phase, death phase, intermission, and game-over state.
+- HUD upgrades: level indicator, ghost mode indicator, fruit label, ghost-eat point popups, and overlay improvements.
+- Configurable settings panel with:
+  - Volume control, mute, key rebinding, and mobile input mode selection.
+  - Persistent settings via `localStorage`.
+- Expanded input support:
+  - Keyboard, touch buttons, swipe, virtual stick, and gamepad.
+- Runtime/performance updates:
+  - `requestAnimationFrame` game loop targeting smooth 60 FPS.
+  - Cached wall tiles and reduced per-frame overhead in hot paths.
+- PWA support:
+  - Installable app via `manifest.webmanifest`.
+  - Offline caching with `service-worker.js`.
+- CI/release upgrades:
+  - Unit + e2e test workflows.
+  - Preview artifact workflow.
+  - Manual release tagging/changelog workflow.
 
 ## Tech Stack
 - HTML5
@@ -46,19 +60,23 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 ### Key Files
 - `index.html`: Page shell, canvas, sprite assets, and script loading.
 - `css/style.css`: Retro UI styling, responsive layout, and touch-control presentation.
-- `scripts/game.js`: Global game state, map data, game loop, rendering pipeline, spawns, controls, audio, and lifecycle.
-- `scripts/gameplay-utils.js`: Shared gameplay helpers (scoring, frightened flashing, and utility math).
+- `scripts/game.js`: Global game state, level progression, ghost AI orchestration, round phases, controls, settings, audio, PWA hooks, and rendering loop.
+- `scripts/gameplay-utils.js`: Shared gameplay helpers (AI targeting math, collision helpers, level tuning, scoring, and state utilities).
 - `scripts/pacman.js`: `Pacman` class (movement, collision, direction change, pellet consumption, draw logic).
-- `scripts/ghost.js`: `Ghost` class (pathfinding/chase/frightened/eaten behaviors, movement, draw logic).
+- `scripts/ghost.js`: `Ghost` class (personality-driven target selection, house-release lifecycle, chase/scatter/frightened/eaten states, movement, draw logic).
 - `scripts/lint.js`: Built-in lint checks (syntax + structural gameplay checks).
-- `tests/*.test.js`: Node-based regression tests for gameplay utilities and critical structure.
-- `.github/workflows/ci.yml`: CI pipeline running lint + tests on push/PR.
+- `tests/*.test.js`: Node-based unit/regression tests for gameplay utilities and structure.
+- `tests/e2e/*.spec.js`: Playwright browser regression tests.
+- `playwright.config.js`: Playwright config with local static web server.
+- `.github/workflows/ci.yml`: Lint + unit tests on push/PR.
+- `.github/workflows/preview-checks.yml`: Preview lint/unit/e2e checks + upload preview artifact.
+- `.github/workflows/release.yml`: Manual tag + changelog + GitHub release workflow.
 
 ### Runtime Flow
 1. `game.js` initializes map state, Pac-Man, ghosts, fruit timers, and starts the interval loop.
 2. Each frame runs `update()` then `draw()`.
 3. `update()` applies movement, collision resolution, food/fruit consumption, ghost interaction, and win/lose checks.
-4. `draw()` renders walls, pellets, fruit, ghosts, Pac-Man, score/lives/high-score, frightened timer, and paused overlay.
+4. `draw()` renders walls, pellets, fruit, ghosts, Pac-Man, popups, score/lives/high-score, level/mode HUD, and phase overlays.
 
 ## Quick Start
 ### Option A: Open Directly
@@ -79,18 +97,19 @@ Primary gameplay/config constants live in `scripts/game.js`.
 
 | Constant | Default | Purpose |
 | --- | --- | --- |
-| `fps` | `30` | Main game loop update/render frequency. |
+| `fps` | `60` | Main game loop update/render frequency (fixed-step updates via `requestAnimationFrame`). |
 | `oneBlockSize` | `20` | Tile size used by movement, collision, and rendering. |
-| `ghostCount` | `4` | Number of ghosts spawned each round. |
 | `lives` | `3` | Starting lives per run. |
-| `FRUIT_SPAWN_DELAY_MS` | `12000` | Delay before fruit appears. |
-| `FRUIT_VISIBLE_MS` | `10000` | How long fruit stays visible. |
-| `POWER_PELLET_FRIGHTENED_MS` | `7000` | Frightened duration after eating a power pellet. |
-| `FRUIT_SCORE` | `50` | Score gained when fruit is collected. |
-| `GHOST_EAT_BASE_SCORE` | `20` | Base score multiplier when eating ghosts during frightened mode. |
+| `ROUND_READY_MS` | `1800` | “Ready!” phase duration before active movement. |
+| `INTERMISSION_MS` | `1500` | Stage-clear intermission duration. |
+| `BONUS_LIFE_STEP` | `10000` | Score interval for bonus lives (`1UP`). |
+| `GHOST_MODE_SCHEDULE` | Classic schedule | Scatter/chase timing cycle for ghost AI. |
+| `FRUIT_TABLE` | 8 classic fruits | Per-level fruit score table. |
 | `MIN_FRUIT_SPAWN_DISTANCE` | `8` | Minimum tile distance between Pac-Man and spawned fruit. |
 | `MIN_GHOST_INITIAL_SPAWN_DISTANCE` | `7` | Minimum initial ghost spawn distance from Pac-Man. |
 | `SWIPE_THRESHOLD_PX` | `24` | Minimum swipe distance to trigger mobile direction change. |
+| `SETTINGS_STORAGE_KEY` | `pacman.settings.v1` | Local persistence key for settings. |
+| `HIGH_SCORE_STORAGE_KEY` | `pacman.highScore` | Local persistence key for high score. |
 
 ## Scripts
 Quality scripts are available through `npm`:
@@ -98,12 +117,16 @@ Quality scripts are available through `npm`:
 ```bash
 npm run lint
 npm test
+npm run test:e2e
 npm run check
+npm run check:all
 ```
 
 - `npm run lint`: Syntax + structural lint checks (`scripts/lint.js`).
-- `npm test`: Regression tests (`tests/*.test.js`) using Node's built-in test runner.
-- `npm run check`: Runs lint and tests together.
+- `npm test` / `npm run test:unit`: Unit/regression tests (`tests/*.test.js`) using Node's built-in test runner.
+- `npm run test:e2e`: Browser end-to-end tests with Playwright (`tests/e2e/*.spec.js`).
+- `npm run check`: Runs lint + unit tests.
+- `npm run check:all`: Runs lint + unit + e2e tests.
 
 ## Deployment
 This project is static and can be deployed to any static host.
@@ -121,12 +144,19 @@ Typical GitHub Pages flow:
 - No authentication or user data processing is present in this codebase.
 - Client-side score/state can be modified by end users (expected for arcade-style browser games).
 - High scores are stored locally in the browser via `localStorage` (`pacman.highScore`).
-- Dependencies are minimal (Google Fonts import only); quality tooling uses Node.js without third-party packages.
+- User settings are stored locally in the browser via `localStorage` (`pacman.settings.v1`).
+- App can be installed and played offline using service-worker caching.
+- Tooling uses Node.js plus Playwright for browser regression testing.
 - License: MIT (`LICENSE`).
 
 ## Roadmap
-- [x] Add frightened-mode ghost visuals/behavior to better mirror arcade rules.
-- [x] Add audio effects and optional mute toggle.
-- [x] Add pause/resume and restart UI controls (in-canvas or header controls).
-- [x] Add local high-score persistence (e.g., `localStorage`).
-- [x] Add automated linting/tests and CI checks for gameplay regressions.
+- [x] Arcade-accurate ghost AI (Blinky/Pinky/Inky/Clyde), scatter/chase cycles, and ghost-house release rules.
+- [x] Level progression with speed/difficulty scaling, fruit tables, and bonus-life milestones.
+- [x] Start/round flow polish with start screen, ready phase, life-loss animation, and intermission transitions.
+- [x] HUD/feedback upgrades with ghost-eat point popups, level indicator, and improved overlays.
+- [x] Settings panel with volume, key rebinding, and local persistence.
+- [x] Input expansion with gamepad support and virtual-stick mobile mode.
+- [x] Stronger regression protection with gameplay unit tests and Playwright e2e tests.
+- [x] Performance/compatibility pass with 60 FPS loop and hot-path optimizations.
+- [x] PWA/offline packaging with manifest + service worker.
+- [x] Release workflow polish with preview checks and automated tag/changelog release flow.

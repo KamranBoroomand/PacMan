@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (without v prefix), for example 1.4.0"
+        required: true
+        type: string
+      publish_release:
+        description: "Publish release (unchecked creates a draft)"
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  release:
+    name: Tag and Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Validate with lint and unit tests
+        run: npm run check
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          TAG="v${{ inputs.version }}"
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+
+          {
+            echo "# PacMan ${TAG}"
+            echo
+            if [ -n "$LAST_TAG" ]; then
+              echo "Changes since ${LAST_TAG}:"
+              echo
+              git log --pretty=format:'- %s (%h)' "${LAST_TAG}"..HEAD
+            else
+              echo "Initial release changes:"
+              echo
+              git log --pretty=format:'- %s (%h)' HEAD
+            fi
+          } > RELEASE_NOTES.md
+
+      - name: Create and push git tag
+        id: tag
+        run: |
+          TAG="v${{ inputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists."
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
+          echo "tag_name=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          body_path: RELEASE_NOTES.md
+          draft: ${{ !inputs.publish_release }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -9,16 +9,35 @@ const syntaxTargets = [
   "scripts/pacman.js",
   "scripts/gameplay-utils.js",
   "scripts/lint.js",
+  "service-worker.js",
+  "playwright.config.js",
 ];
 
-const testDirectory = path.join(projectRoot, "tests");
-if (fs.existsSync(testDirectory)) {
-  const testFiles = fs
-    .readdirSync(testDirectory)
-    .filter((file) => file.endsWith(".test.js"))
-    .map((file) => path.join("tests", file));
-  syntaxTargets.push(...testFiles);
+function collectJsFilesRecursively(directoryPath, prefixPath = "") {
+  if (!fs.existsSync(directoryPath)) return [];
+
+  const entries = fs.readdirSync(directoryPath, { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    const relativePath = path.join(prefixPath, entry.name);
+    const absolutePath = path.join(directoryPath, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...collectJsFilesRecursively(absolutePath, relativePath));
+      continue;
+    }
+
+    if (entry.isFile() && entry.name.endsWith(".js")) {
+      files.push(relativePath);
+    }
+  }
+
+  return files;
 }
+
+const testFiles = collectJsFilesRecursively(path.join(projectRoot, "tests"), "tests");
+syntaxTargets.push(...testFiles);
 
 const failures = [];
 
@@ -53,9 +72,13 @@ for (const targetFile of syntaxTargets) {
 }
 
 const indexHtml = readText("index.html");
+ensureIncludes(indexHtml, 'id="start-game"', "[structure] Start button is missing from index.html.");
 ensureIncludes(indexHtml, 'id="pause-toggle"', "[structure] Pause button is missing from index.html.");
 ensureIncludes(indexHtml, 'id="restart-game"', "[structure] Restart button is missing from index.html.");
 ensureIncludes(indexHtml, 'id="mute-toggle"', "[structure] Mute button is missing from index.html.");
+ensureIncludes(indexHtml, 'id="mobile-input-mode"', "[structure] Mobile input setting is missing from index.html.");
+ensureIncludes(indexHtml, 'id="virtual-stick"', "[structure] Virtual stick container is missing from index.html.");
+ensureIncludes(indexHtml, "manifest.webmanifest", "[pwa] Web app manifest is not linked from index.html.");
 ensureIncludes(indexHtml, "scripts/gameplay-utils.js", "[structure] gameplay-utils.js is not loaded in index.html.");
 
 const gameplayUtilsScriptPosition = indexHtml.indexOf("scripts/gameplay-utils.js");
@@ -70,10 +93,26 @@ if (
 
 const gameJs = readText("scripts/game.js");
 ensureIncludes(gameJs, "HIGH_SCORE_STORAGE_KEY", "[gameplay] High score persistence key is missing.");
-ensureIncludes(gameJs, "activateFrightenedMode", "[gameplay] Frightened mode activation is missing.");
-ensureIncludes(gameJs, 'key === "p"', "[controls] Pause keyboard shortcut (P) is missing.");
-ensureIncludes(gameJs, 'key === "r"', "[controls] Restart keyboard shortcut (R) is missing.");
-ensureIncludes(gameJs, 'key === "m"', "[controls] Mute keyboard shortcut (M) is missing.");
+ensureIncludes(gameJs, "SETTINGS_STORAGE_KEY", "[settings] Settings persistence key is missing.");
+ensureIncludes(gameJs, "GHOST_DEFINITIONS", "[ai] Ghost personality definitions are missing.");
+ensureIncludes(gameJs, "GHOST_MODE_SCHEDULE", "[ai] Scatter/chase schedule is missing.");
+ensureIncludes(gameJs, "startNextLevel", "[progression] Level progression helper is missing.");
+ensureIncludes(gameJs, "navigator.getGamepads", "[input] Gamepad input support is missing.");
+ensureIncludes(gameJs, "requestAnimationFrame(gameLoop)", "[perf] requestAnimationFrame loop is missing.");
+ensureIncludes(gameJs, "serviceWorker.register", "[pwa] Service worker registration is missing.");
+
+if (!fs.existsSync(path.join(projectRoot, "manifest.webmanifest"))) {
+  fail("[pwa] manifest.webmanifest file is missing.");
+}
+if (!fs.existsSync(path.join(projectRoot, "service-worker.js"))) {
+  fail("[pwa] service-worker.js file is missing.");
+}
+if (!fs.existsSync(path.join(projectRoot, ".github/workflows/preview-checks.yml"))) {
+  fail("[release] Preview checks workflow is missing.");
+}
+if (!fs.existsSync(path.join(projectRoot, ".github/workflows/release.yml"))) {
+  fail("[release] Release workflow is missing.");
+}
 
 if (failures.length > 0) {
   console.error("Lint checks failed:\n");
