@@ -9,6 +9,7 @@ const muteToggleButton = document.getElementById("mute-toggle");
 const installAppButton = document.getElementById("install-app");
 const volumeControl = document.getElementById("volume-control");
 const mobileInputModeSelect = document.getElementById("mobile-input-mode");
+const settingsPanel = document.getElementById("settings-panel");
 const keybindButtons = Array.from(document.querySelectorAll(".keybind-btn[data-action]"));
 const keybindHelp = document.getElementById("keybind-help");
 const touchControlsRoot = document.getElementById("touch-controls");
@@ -472,6 +473,101 @@ function validateMapRectangular() {
   return { rows: map.length, cols };
 }
 
+function parseCssLength(rawValue) {
+  const parsedValue = Number.parseFloat(rawValue);
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
+
+function getVisibleElementHeight(element) {
+  if (!element) return 0;
+  const style = window.getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden") return 0;
+  return element.getBoundingClientRect().height;
+}
+
+function measureCanvasShellOverhead() {
+  const canvasShell = document.querySelector(".canvas-shell");
+  if (!canvasShell) return 0;
+
+  const shellStyle = window.getComputedStyle(canvasShell);
+  let overheadHeight =
+    parseCssLength(shellStyle.paddingTop) +
+    parseCssLength(shellStyle.paddingBottom) +
+    parseCssLength(shellStyle.borderTopWidth) +
+    parseCssLength(shellStyle.borderBottomWidth);
+
+  if (
+    touchControlsRoot &&
+    !touchControlsRoot.classList.contains("hidden") &&
+    window.getComputedStyle(touchControlsRoot).display !== "none"
+  ) {
+    const touchStyle = window.getComputedStyle(touchControlsRoot);
+    overheadHeight +=
+      getVisibleElementHeight(touchControlsRoot) +
+      parseCssLength(touchStyle.marginTop) +
+      parseCssLength(touchStyle.marginBottom);
+  }
+
+  if (
+    virtualStickRoot &&
+    !virtualStickRoot.classList.contains("hidden") &&
+    window.getComputedStyle(virtualStickRoot).display !== "none"
+  ) {
+    const stickStyle = window.getComputedStyle(virtualStickRoot);
+    overheadHeight +=
+      getVisibleElementHeight(virtualStickRoot) +
+      parseCssLength(stickStyle.marginTop) +
+      parseCssLength(stickStyle.marginBottom);
+  }
+
+  return overheadHeight;
+}
+
+function measureNonCanvasUiHeight() {
+  const bodyStyle = window.getComputedStyle(document.body);
+  const bodyPaddingHeight =
+    parseCssLength(bodyStyle.paddingTop) + parseCssLength(bodyStyle.paddingBottom);
+  const bodyGap = parseCssLength(bodyStyle.rowGap || bodyStyle.gap);
+  const topLevelGapHeight = bodyGap * 2;
+
+  const gameShell = document.querySelector(".game-shell");
+  const gameShellStyle = gameShell ? window.getComputedStyle(gameShell) : null;
+  const gameShellGapHeight = gameShellStyle
+    ? parseCssLength(gameShellStyle.rowGap || gameShellStyle.gap)
+    : 0;
+
+  const headerHeight = getVisibleElementHeight(document.querySelector(".site-header"));
+  const settingsHeight = getVisibleElementHeight(settingsPanel);
+  const footerHeight = getVisibleElementHeight(document.querySelector(".site-footer"));
+
+  return (
+    bodyPaddingHeight +
+    topLevelGapHeight +
+    headerHeight +
+    settingsHeight +
+    footerHeight +
+    gameShellGapHeight +
+    measureCanvasShellOverhead() +
+    12
+  );
+}
+
+function getCanvasMaxWidth() {
+  const gameShell = document.querySelector(".game-shell");
+  const canvasShell = document.querySelector(".canvas-shell");
+  const shellStyle = canvasShell ? window.getComputedStyle(canvasShell) : null;
+  const shellHorizontalChrome = shellStyle
+    ? parseCssLength(shellStyle.paddingLeft) +
+      parseCssLength(shellStyle.paddingRight) +
+      parseCssLength(shellStyle.borderLeftWidth) +
+      parseCssLength(shellStyle.borderRightWidth)
+    : 0;
+
+  const fallbackWidth = Math.max(280, window.innerWidth - 24);
+  const gameShellWidth = gameShell ? gameShell.clientWidth : fallbackWidth;
+  return Math.max(280, gameShellWidth - shellHorizontalChrome);
+}
+
 function resizeCanvasToFitViewport() {
   const { rows, cols } = validateMapRectangular();
   dpr = window.devicePixelRatio || 1;
@@ -479,13 +575,8 @@ function resizeCanvasToFitViewport() {
   logicalW = cols * oneBlockSize;
   logicalH = (rows + HUD_ROWS) * oneBlockSize;
 
-  const padding = 24;
-  const header = document.querySelector(".site-header");
-  const headerGuess = header
-    ? Math.min(header.offsetHeight + 10, 110)
-    : 90;
-  const availW = Math.max(320, window.innerWidth - padding);
-  const availH = Math.max(320, window.innerHeight - headerGuess);
+  const availW = getCanvasMaxWidth();
+  const availH = Math.max(220, window.innerHeight - measureNonCanvasUiHeight());
 
   renderScale = Math.min(availW / logicalW, availH / logicalH, 1);
 
@@ -1978,6 +2069,13 @@ function wireUiEvents() {
       persistSettings();
       updateMobileInputPresentation();
       resetStickKnob();
+      resizeCanvasToFitViewport();
+    });
+  }
+
+  if (settingsPanel) {
+    settingsPanel.addEventListener("toggle", () => {
+      resizeCanvasToFitViewport();
     });
   }
 
@@ -2020,8 +2118,8 @@ function wireUiEvents() {
   });
 
   window.addEventListener("resize", () => {
-    resizeCanvasToFitViewport();
     updateMobileInputPresentation();
+    resizeCanvasToFitViewport();
   });
 
   window.addEventListener("beforeunload", () => {
@@ -2041,13 +2139,13 @@ function boot() {
   applyLevelTuning(level);
   prepareRound();
 
+  updateMobileInputPresentation();
   resizeCanvasToFitViewport();
   renderStartButton();
   renderPauseButton();
   renderMuteButton();
   renderInstallButton();
   renderSettingsUi();
-  updateMobileInputPresentation();
   applyAudioSettings();
   registerPwaHandlers();
   wireUiEvents();

@@ -28,8 +28,11 @@ body {
 }
 
 body {
+  min-height: 100dvh;
+  width: 100%;
   position: relative;
   overflow-x: hidden;
+  overflow-y: auto;
   background:
     radial-gradient(circle at 16% 12%, rgba(255, 190, 110, 0.12), transparent 28%),
     radial-gradient(circle at 84% 82%, rgba(124, 247, 212, 0.14), transparent 34%),
@@ -40,8 +43,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px clamp(10px, 2vw, 28px) 18px;
-  gap: 10px;
+  justify-content: center;
+  padding: clamp(8px, 1.2vh, 14px) clamp(10px, 2vw, 28px) clamp(12px, 1.8vh, 20px);
+  gap: clamp(8px, 1.1vh, 12px);
   animation: body-shift 18s ease-in-out infinite alternate;
 }
 
@@ -49,10 +53,50 @@ body {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: -2;
+  z-index: -4;
+}
+
+.bg-pixel {
+  z-index: -4;
+  opacity: 0.76;
+  background:
+    linear-gradient(180deg, rgba(3, 6, 11, 0.92), rgba(4, 9, 16, 0.98)),
+    repeating-linear-gradient(0deg, rgba(124, 247, 212, 0.11) 0 1px, transparent 1px 20px),
+    repeating-linear-gradient(90deg, rgba(124, 247, 212, 0.11) 0 1px, transparent 1px 20px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
+  transform-origin: center;
+  animation: pixel-grid-drift 24s linear infinite;
+}
+
+.bg-pixel::before {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 190, 110, 0.24) 0%,
+    rgba(113, 169, 255, 0.14) 18%,
+    rgba(124, 247, 212, 0.05) 34%,
+    transparent 62%
+  );
+  filter: blur(4px);
+  animation: pixel-ripple 8s ease-in-out infinite;
+}
+
+.bg-pixel::after {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background:
+    radial-gradient(circle at 20% 28%, rgba(124, 247, 212, 0.18), transparent 28%),
+    radial-gradient(circle at 80% 72%, rgba(255, 190, 110, 0.14), transparent 26%);
+  mix-blend-mode: screen;
+  opacity: 0.85;
+  animation: pixel-orbit 18s linear infinite;
 }
 
 .bg-stars {
+  z-index: -3;
   background-image:
     radial-gradient(circle at 20% 20%, rgba(255, 190, 110, 0.2), transparent 34%),
     radial-gradient(circle at 80% 15%, rgba(124, 247, 212, 0.16), transparent 30%),
@@ -80,7 +124,7 @@ body {
 }
 
 .bg-radial {
-  z-index: -2;
+  z-index: -3;
   background:
     radial-gradient(circle at 50% -10%, rgba(124, 247, 212, 0.22), transparent 50%),
     radial-gradient(circle at 52% 112%, rgba(255, 190, 110, 0.17), transparent 44%);
@@ -483,6 +527,38 @@ body {
   }
   100% {
     transform: translateX(180%);
+  }
+}
+
+@keyframes pixel-grid-drift {
+  0% {
+    transform: scale(1) translate3d(0, 0, 0);
+    background-position: 0 0, 0 0, 0 0;
+  }
+  100% {
+    transform: scale(1.08) translate3d(-2%, -1%, 0);
+    background-position: 0 0, 0 20px, 20px 0;
+  }
+}
+
+@keyframes pixel-ripple {
+  0%,
+  100% {
+    transform: scale(0.72);
+    opacity: 0.44;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.78;
+  }
+}
+
+@keyframes pixel-orbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 
