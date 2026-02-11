@@ -6,6 +6,7 @@ const startGameButton = document.getElementById("start-game");
 const pauseToggleButton = document.getElementById("pause-toggle");
 const restartGameButton = document.getElementById("restart-game");
 const muteToggleButton = document.getElementById("mute-toggle");
+const arcadeViewToggleButton = document.getElementById("arcade-view-toggle");
 const installAppButton = document.getElementById("install-app");
 const volumeControl = document.getElementById("volume-control");
 const mobileInputModeSelect = document.getElementById("mobile-input-mode");
@@ -50,13 +51,14 @@ const MIN_FRUIT_SPAWN_DISTANCE = 8;
 const MIN_GHOST_INITIAL_SPAWN_DISTANCE = 7;
 const SETTINGS_STORAGE_KEY = "pacman.settings.v1";
 const HIGH_SCORE_STORAGE_KEY = "pacman.highScore";
-const GHOST_HOME_TILE = { x: 13, y: 13 };
-const GHOST_HOUSE_EXIT_TILE = { x: 13, y: 12 };
+const ARCADE_VIEW_STORAGE_KEY = "pacman.arcadeView.enabled";
+const GHOST_HOME_TILE = { x: 21, y: 13 };
+const GHOST_HOUSE_EXIT_TILE = { x: 21, y: 12 };
 const GHOST_HOUSE_EXIT_BY_PERSONALITY = {
-  blinky: { x: 13, y: 11 },
-  pinky: { x: 13, y: 12 },
-  inky: { x: 13, y: 12 },
-  clyde: { x: 13, y: 12 },
+  blinky: { x: 21, y: 11 },
+  pinky: { x: 21, y: 12 },
+  inky: { x: 21, y: 12 },
+  clyde: { x: 21, y: 12 },
 };
 const BASE_AUDIO_GAIN = 0.25;
 const GHOST_MODE_SCHEDULE = [
@@ -75,11 +77,11 @@ const GHOST_DEFINITIONS = [
     id: "blinky",
     displayName: "Blinky",
     spriteIndex: 0,
-    scatterTile: { x: 26, y: 1 },
+    scatterTile: { x: 42, y: 1 },
     startInHouse: false,
     releaseDotThreshold: 0,
     forceReleaseMs: 0,
-    spawnTile: { x: 13, y: 11 },
+    spawnTile: { x: 21, y: 11 },
   },
   {
     id: "pinky",
@@ -88,18 +90,18 @@ const GHOST_DEFINITIONS = [
     scatterTile: { x: 1, y: 1 },
     startInHouse: true,
     releaseDotThreshold: 0,
-    forceReleaseMs: 900,
-    spawnTile: { x: 12, y: 13 },
+    forceReleaseMs: 700,
+    spawnTile: { x: 20, y: 13 },
   },
   {
     id: "inky",
     displayName: "Inky",
     spriteIndex: 2,
-    scatterTile: { x: 26, y: 29 },
+    scatterTile: { x: 42, y: 29 },
     startInHouse: true,
-    releaseDotThreshold: 8,
-    forceReleaseMs: 2400,
-    spawnTile: { x: 13, y: 13 },
+    releaseDotThreshold: 6,
+    forceReleaseMs: 1800,
+    spawnTile: { x: 21, y: 13 },
   },
   {
     id: "clyde",
@@ -107,9 +109,9 @@ const GHOST_DEFINITIONS = [
     spriteIndex: 3,
     scatterTile: { x: 1, y: 29 },
     startInHouse: true,
-    releaseDotThreshold: 18,
-    forceReleaseMs: 4200,
-    spawnTile: { x: 14, y: 13 },
+    releaseDotThreshold: 14,
+    forceReleaseMs: 3200,
+    spawnTile: { x: 22, y: 13 },
   },
 ];
 
@@ -222,6 +224,7 @@ let stickCenterX = 0;
 let stickCenterY = 0;
 let pendingRebindAction = null;
 let settings = loadSettings();
+let arcadeViewEnabled = false;
 let audioContext = null;
 let audioMasterGain = null;
 let deferredInstallPrompt = null;
@@ -244,49 +247,71 @@ let createRect = (x, y, width, height, color) => {
 
 // Legend: 1 = wall, 2 = pellet, 4 = power pellet, 0 = empty path
 const classicMap = [
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1],
-  [1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,1,1,1,1,2,1,1,2,1,1,1,1,1,1,1,1,2,1,1,1,2,1,1,1,2,1],
-  [1,2,2,2,2,2,2,1,1,2,2,2,2,1,1,2,2,2,2,1,1,2,2,2,2,2,2,1],
-  [1,1,1,1,1,1,2,1,1,1,1,1,0,1,1,0,1,1,1,1,1,2,1,1,1,1,1,1],
-  [0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,1,0,0,0,0,0],
-  [1,1,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,1,1],
-  [1,1,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,1,1],
-  [1,2,2,2,2,2,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,2,2,2,2,2,1],
-  [1,2,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,2,1],
-  [1,2,2,2,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,2,2,2,2,2,1],
-  [1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,1,1,1,1],
-  [0,0,0,0,0,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,0,0,0,0,0],
-  [1,1,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,1,1],
-  [1,2,2,2,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,2,2,2,2,2,1],
-  [1,2,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,1,1,2,1],
-  [1,2,2,2,2,2,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,2,2,2,2,2,1],
-  [1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1],
-  [1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1],
-  [1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1],
-  [1,2,2,2,2,2,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,2,2,2,2,2,1],
-  [1,2,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,1,1,2,1],
-  [1,2,2,2,2,2,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,2,2,2,2,2,1],
-  [1,2,1,1,2,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,2,1,2,1],
-  [1,2,2,2,1,2,2,2,2,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,1,2,2,1],
-  [1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
+  [1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1],
+  [1,2,1,0,0,1,2,1,1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1,1,2,1,0,0,1,2,1],
+  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
+  [1,2,1,1,2,1,2,1,1,2,1,1,1,1,2,1,1,2,1,1,1,1,1,1,1,1,2,1,1,1,2,1,1,1,2,1,1,2,1,2,1,1,2,1],
+  [1,2,2,1,2,1,2,1,1,2,2,2,2,2,2,1,1,2,2,2,2,1,1,2,2,2,2,1,1,2,2,2,2,2,2,1,1,2,1,2,1,2,2,1],
+  [1,1,1,1,2,1,2,1,1,1,1,1,1,1,2,1,1,1,1,1,0,1,1,0,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,2,1,1,1,1],
+  [0,0,0,0,2,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,1,0,0,0,0,0,0,0,0,2,0,0,0,0],
+  [1,1,1,1,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,1,1,1,2,1,2,1,1,1,1],
+  [1,2,2,2,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,1,1,1,2,1,2,2,2,2,1],
+  [1,2,1,0,0,1,2,1,1,2,2,2,2,2,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,2,2,2,2,2,1,1,2,1,0,0,1,2,1],
+  [1,2,1,2,2,1,2,1,1,2,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,2,1,1,2,1,2,2,1,2,1],
+  [1,2,1,2,2,1,2,1,1,2,2,2,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,2,2,2,2,2,1,1,2,1,2,2,1,2,1],
+  [1,2,2,2,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,1,1,1,1,1,2,1,2,2,2,2,1],
+  [0,0,0,0,2,0,0,0,0,0,0,0,0,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,0,0,0,0,0,0,0,0,2,0,0,0,0],
+  [1,2,1,1,1,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,1,1,1,2,1,1,1,1,2,1],
+  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
+  [1,2,1,2,2,1,2,1,1,2,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,1,1,2,1,1,2,1,2,2,1,2,1],
+  [1,2,1,0,0,1,2,1,1,2,2,2,2,2,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,2,2,2,2,2,1,1,2,1,0,0,1,2,1],
+  [1,2,2,2,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,2,1,2,2,2,2,1],
+  [1,2,1,1,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,2,1,2,1,1,2,1],
+  [1,2,1,2,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,2,1,2,2,1,2,1],
+  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
+  [1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1],
+  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
+  [1,2,1,2,2,1,2,1,1,2,1,1,2,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,2,1,2,1,1,2,1,2,2,1,2,1],
+  [1,2,2,0,0,1,2,1,1,2,2,2,1,2,2,2,2,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,1,2,2,1,1,2,1,0,0,2,2,1],
+  [1,2,1,1,1,1,2,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,2,1,1,1,1,2,1],
+  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
 ];
 
-for (let y = 18; y <= 26; y++) {
-  classicMap[y][13] = 2;
-  classicMap[y][14] = 2;
+const wingConnectorRows = [4, 11, 17, 23, 29];
+for (let i = 0; i < wingConnectorRows.length; i++) {
+  const row = wingConnectorRows[i];
+  classicMap[row][7] = 2;
+  classicMap[row][8] = 2;
+  classicMap[row][35] = 2;
+  classicMap[row][36] = 2;
 }
 
-const pacmanStart = { x: 13, y: 23 };
+const horizontalTunnelRows = [8, 15, 27];
+for (let i = 0; i < horizontalTunnelRows.length; i++) {
+  const row = horizontalTunnelRows[i];
+  const lastColumn = classicMap[row].length - 1;
+  classicMap[row][0] = 0;
+  classicMap[row][1] = 2;
+  classicMap[row][2] = 2;
+  classicMap[row][lastColumn - 2] = 2;
+  classicMap[row][lastColumn - 1] = 2;
+  classicMap[row][lastColumn] = 0;
+}
+
+for (let y = 18; y <= 26; y++) {
+  classicMap[y][21] = 2;
+  classicMap[y][22] = 2;
+}
+
+const mapLastColumn = classicMap[0].length - 1;
+const pacmanStart = { x: 21, y: 23 };
 classicMap[1][1] = 4;
-classicMap[1][26] = 4;
+classicMap[1][mapLastColumn - 1] = 4;
 classicMap[26][1] = 4;
-classicMap[26][26] = 4;
+classicMap[26][mapLastColumn - 1] = 4;
 classicMap[pacmanStart.y][pacmanStart.x] = 0;
 classicMap[pacmanStart.y][pacmanStart.x + 1] = 0;
 
@@ -400,6 +425,29 @@ function syncHighScore() {
   persistHighScore();
 }
 
+function loadArcadeViewPreference() {
+  try {
+    return localStorage.getItem(ARCADE_VIEW_STORAGE_KEY) === "1";
+  } catch (error) {
+    return false;
+  }
+}
+
+function persistArcadeViewPreference(enabled) {
+  try {
+    localStorage.setItem(ARCADE_VIEW_STORAGE_KEY, enabled ? "1" : "0");
+  } catch (error) {
+    // Ignore storage failures.
+  }
+}
+
+function canUseArcadeView() {
+  return (
+    window.innerWidth >= 980 &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches
+  );
+}
+
 function renderMuteButton() {
   if (!muteToggleButton) return;
   muteToggleButton.textContent = settings.muted ? "Sound: Off" : "Sound: On";
@@ -429,6 +477,39 @@ function renderInstallButton() {
   } else {
     installAppButton.classList.add("hidden");
   }
+}
+
+function renderArcadeViewButton() {
+  if (!arcadeViewToggleButton) return;
+
+  const canUse = canUseArcadeView();
+  arcadeViewToggleButton.classList.toggle("hidden", !canUse);
+
+  document.body.classList.toggle("arcade-view", canUse && arcadeViewEnabled);
+
+  arcadeViewToggleButton.textContent = arcadeViewEnabled ? "Exit Arcade" : "Arcade View";
+  arcadeViewToggleButton.setAttribute("aria-pressed", String(arcadeViewEnabled));
+}
+
+function setArcadeViewEnabled(enabled, options = {}) {
+  const shouldPersist = options.persist !== false;
+  const nextEnabled = Boolean(enabled) && canUseArcadeView();
+
+  if (arcadeViewEnabled === nextEnabled && document.body.classList.contains("arcade-view") === nextEnabled) {
+    if (shouldPersist) persistArcadeViewPreference(nextEnabled);
+    renderArcadeViewButton();
+    return;
+  }
+
+  arcadeViewEnabled = nextEnabled;
+  document.body.classList.toggle("arcade-view", arcadeViewEnabled);
+  renderArcadeViewButton();
+
+  if (shouldPersist) {
+    persistArcadeViewPreference(arcadeViewEnabled);
+  }
+
+  resizeCanvasToFitViewport();
 }
 
 function renderKeybindButtons() {
@@ -577,8 +658,11 @@ function resizeCanvasToFitViewport() {
 
   const availW = getCanvasMaxWidth();
   const availH = Math.max(220, window.innerHeight - measureNonCanvasUiHeight());
+  const coarsePointer = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+  const arcadeScaleActive = arcadeViewEnabled && canUseArcadeView();
+  const maxScale = arcadeScaleActive ? 1.65 : (coarsePointer ? 1 : 1.12);
 
-  renderScale = Math.min(availW / logicalW, availH / logicalH, 1);
+  renderScale = Math.min(availW / logicalW, availH / logicalH, maxScale);
 
   const cssW = Math.floor(logicalW * renderScale);
   const cssH = Math.floor(logicalH * renderScale);
@@ -870,9 +954,9 @@ function getLevelTuning(levelNumber) {
   const safeLevel = Math.max(1, levelNumber);
   return {
     level: safeLevel,
-    pacmanSpeedMultiplier: 1 + (safeLevel - 1) * 0.015,
-    ghostSpeedMultiplier: 1 + (safeLevel - 1) * 0.018,
-    frightenedDurationMs: Math.max(2400, 7000 - (safeLevel - 1) * 380),
+    pacmanSpeedMultiplier: 1 + (safeLevel - 1) * 0.014,
+    ghostSpeedMultiplier: 1 + (safeLevel - 1) * 0.022,
+    frightenedDurationMs: Math.max(2200, 6800 - (safeLevel - 1) * 420),
     fruitSpawnDelayMs: Math.max(5000, 12000 - (safeLevel - 1) * 350),
     fruitVisibleMs: Math.max(4200, 10000 - (safeLevel - 1) * 220),
   };
@@ -2055,6 +2139,12 @@ function wireUiEvents() {
     });
   }
 
+  if (arcadeViewToggleButton) {
+    arcadeViewToggleButton.addEventListener("click", () => {
+      setArcadeViewEnabled(!arcadeViewEnabled);
+    });
+  }
+
   if (volumeControl) {
     volumeControl.addEventListener("input", (event) => {
       settings.volume = Number(event.target.value);
@@ -2119,6 +2209,7 @@ function wireUiEvents() {
 
   window.addEventListener("resize", () => {
     updateMobileInputPresentation();
+    renderArcadeViewButton();
     resizeCanvasToFitViewport();
   });
 
@@ -2135,6 +2226,9 @@ function boot() {
   highScore = readHighScoreFromStorage();
   syncHighScore();
 
+  arcadeViewEnabled = loadArcadeViewPreference() && canUseArcadeView();
+  document.body.classList.toggle("arcade-view", arcadeViewEnabled);
+
   resetMap();
   applyLevelTuning(level);
   prepareRound();
@@ -2145,6 +2239,7 @@ function boot() {
   renderPauseButton();
   renderMuteButton();
   renderInstallButton();
+  renderArcadeViewButton();
   renderSettingsUi();
   applyAudioSettings();
   registerPwaHandlers();

@@ -80,3 +80,24 @@ test("ghost-house exit tiles are always walkable", () => {
     );
   }
 });
+
+test("map keeps at least two wrap tunnel rows", () => {
+  const classicMapLiteral = extractLiteral(
+    /const classicMap = (\[[\s\S]*?\n\]);/,
+    "classicMap"
+  );
+
+  const classicMap = evaluateLiteral(classicMapLiteral, "classicMap");
+  const lastColumn = classicMap[0].length - 1;
+
+  const tunnelRows = [];
+  for (let row = 0; row < classicMap.length; row++) {
+    if (classicMap[row][0] === 1 || classicMap[row][lastColumn] === 1) continue;
+    tunnelRows.push(row);
+  }
+
+  assert.ok(
+    tunnelRows.length >= 2,
+    `Expected at least 2 tunnel rows, got ${tunnelRows.length}`
+  );
+});

@@ -204,17 +204,113 @@
     return priority === -1 ? defaultOrder.length : priority;
   }
 
+  function isWalkableTile(map, x, y) {
+    if (!Array.isArray(map) || map.length === 0) return false;
+    if (y < 0 || y >= map.length) return false;
+    if (x < 0 || x >= map[0].length) return false;
+    return map[y][x] !== 1;
+  }
+
+  function normalizeTunnelX(map, x, y) {
+    if (!Array.isArray(map) || map.length === 0) return x;
+    const cols = map[0].length;
+    if (x >= 0 && x < cols) return x;
+    if (y < 0 || y >= map.length) return x;
+
+    const isTunnelRow = map[y][0] !== 1 && map[y][cols - 1] !== 1;
+    if (!isTunnelRow) return x;
+    return x < 0 ? cols - 1 : 0;
+  }
+
+  function getMapNeighbors(map, tileX, tileY) {
+    const neighbors = [];
+    const deltas = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+    ];
+
+    for (let i = 0; i < deltas.length; i++) {
+      let nextX = tileX + deltas[i].x;
+      const nextY = tileY + deltas[i].y;
+
+      if (deltas[i].x !== 0) {
+        nextX = normalizeTunnelX(map, nextX, tileY);
+      }
+
+      if (isWalkableTile(map, nextX, nextY)) {
+        neighbors.push({ x: nextX, y: nextY });
+      }
+    }
+
+    return neighbors;
+  }
+
+  function estimatePathDistance(map, fromTile, targetTile, maxDepth = 100) {
+    if (!Array.isArray(map) || map.length === 0) return Infinity;
+    if (!fromTile || !targetTile) return Infinity;
+
+    const startX = toSafeInteger(fromTile.x, 0);
+    const startY = toSafeInteger(fromTile.y, 0);
+    const goalX = toSafeInteger(targetTile.x, 0);
+    const goalY = toSafeInteger(targetTile.y, 0);
+    const safeMaxDepth = Math.max(1, toSafeInteger(maxDepth, 100));
+
+    if (!isWalkableTile(map, startX, startY)) return Infinity;
+    if (startX === goalX && startY === goalY) return 0;
+
+    const visited = Array.from({ length: map.length }, () =>
+      Array(map[0].length).fill(false)
+    );
+    const queue = [{ x: startX, y: startY, depth: 0 }];
+    visited[startY][startX] = true;
+    let head = 0;
+
+    while (head < queue.length) {
+      const current = queue[head];
+      head++;
+
+      if (current.depth >= safeMaxDepth) continue;
+
+      const neighbors = getMapNeighbors(map, current.x, current.y);
+      for (let i = 0; i < neighbors.length; i++) {
+        const neighbor = neighbors[i];
+        if (visited[neighbor.y][neighbor.x]) continue;
+
+        const nextDepth = current.depth + 1;
+        if (neighbor.x === goalX && neighbor.y === goalY) {
+          return nextDepth;
+        }
+
+        visited[neighbor.y][neighbor.x] = true;
+        queue.push({ x: neighbor.x, y: neighbor.y, depth: nextDepth });
+      }
+    }
+
+    return Infinity;
+  }
+
   function pickGhostDirection({
     candidates,
     targetTile,
     currentDirection,
     personality,
+    map,
+    mode = "normal",
+    maxPathDepth = 100,
   }) {
     if (!Array.isArray(candidates) || candidates.length === 0) {
       return currentDirection;
     }
 
     const safeTarget = targetTile || { x: 0, y: 0 };
+    const usePathing =
+      Array.isArray(map) &&
+      map.length > 0 &&
+      Array.isArray(map[0]) &&
+      map[0].length > 0 &&
+      mode !== "frightened";
     let bestCandidate = null;
     let bestScore = Infinity;
 
@@ -226,9 +322,34 @@
 
       const dx = safeTarget.x - candidate.x;
       const dy = safeTarget.y - candidate.y;
-      let score = dx * dx + dy * dy;
+      const euclideanScore = dx * dx + dy * dy;
+      let score = euclideanScore;
 
-      if (candidate.direction === currentDirection) {
+      if (usePathing) {
+        const pathDistance = estimatePathDistance(
+          map,
+          { x: candidate.x, y: candidate.y },
+          safeTarget,
+          maxPathDepth
+        );
+        const pathScore = Number.isFinite(pathDistance)
+          ? pathDistance * 100
+          : 100000;
+        score = pathScore + euclideanScore;
+
+        const exits = getMapNeighbors(map, candidate.x, candidate.y).length;
+        if (mode !== "eaten") {
+          if (exits <= 1) {
+            score += 14;
+          } else if (exits === 2) {
+            score += 1.6;
+          }
+        }
+
+        if (candidate.direction === currentDirection) {
+          score -= 3.2;
+        }
+      } else if (candidate.direction === currentDirection) {
         score -= 0.08;
       }
 
@@ -269,9 +390,9 @@
 
     return {
       level: safeLevel,
-      pacmanSpeedMultiplier: 1 + (clampedLevel - 1) * 0.015,
-      ghostSpeedMultiplier: 1 + (clampedLevel - 1) * 0.018,
-      frightenedDurationMs: Math.max(2400, 7000 - (safeLevel - 1) * 380),
+      pacmanSpeedMultiplier: 1 + (clampedLevel - 1) * 0.014,
+      ghostSpeedMultiplier: 1 + (clampedLevel - 1) * 0.022,
+      frightenedDurationMs: Math.max(2200, 6800 - (safeLevel - 1) * 420),
       fruitSpawnDelayMs: Math.max(5000, 12000 - (safeLevel - 1) * 350),
       fruitVisibleMs: Math.max(4200, 10000 - (safeLevel - 1) * 220),
     };

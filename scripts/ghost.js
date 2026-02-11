@@ -578,11 +578,15 @@ class Ghost {
             typeof utils.pickGhostDirection === "function" &&
             directionalCandidates.length > 0
         ) {
+            const mode = this.isEaten() ? "eaten" : (this.isFrightened() ? "frightened" : "normal");
             const pickedDirection = utils.pickGhostDirection({
                 candidates: directionalCandidates,
                 targetTile,
                 currentDirection: this.direction,
                 personality: this.personality,
+                map: currentMap,
+                mode,
+                maxPathDepth: this.isEaten() ? 130 : 96,
             });
             if (Number.isFinite(pickedDirection)) {
                 return pickedDirection;
