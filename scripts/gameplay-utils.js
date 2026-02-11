@@ -614,9 +614,139 @@
     return false;
   }
 
+  function toCollisionRect(rect) {
+    if (!rect || typeof rect !== "object") return null;
+
+    const x = Number(rect.x);
+    const y = Number(rect.y);
+    const width = Number(rect.width);
+    const height = Number(rect.height);
+
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      width <= 0 ||
+      height <= 0
+    ) {
+      return null;
+    }
+
+    return { x, y, width, height };
+  }
+
+  function rectsOverlap(rectA, rectB) {
+    const a = toCollisionRect(rectA);
+    const b = toCollisionRect(rectB);
+
+    if (!a || !b) return false;
+
+    return (
+      a.x < b.x + b.width &&
+      a.x + a.width > b.x &&
+      a.y < b.y + b.height &&
+      a.y + a.height > b.y
+    );
+  }
+
+  function getAxisSweepInterval(relativeStart, relativeVelocity, halfExtent) {
+    if (
+      !Number.isFinite(relativeStart) ||
+      !Number.isFinite(relativeVelocity) ||
+      !Number.isFinite(halfExtent) ||
+      halfExtent < 0
+    ) {
+      return null;
+    }
+
+    if (relativeVelocity === 0) {
+      if (Math.abs(relativeStart) > halfExtent) return null;
+      return { entry: -Infinity, exit: Infinity };
+    }
+
+    const t1 = (-halfExtent - relativeStart) / relativeVelocity;
+    const t2 = (halfExtent - relativeStart) / relativeVelocity;
+
+    return { entry: Math.min(t1, t2), exit: Math.max(t1, t2) };
+  }
+
+  function didRectsCollideDuringStep({
+    previousRectA,
+    currentRectA,
+    previousRectB,
+    currentRectB,
+  }) {
+    const prevA = toCollisionRect(previousRectA);
+    const currA = toCollisionRect(currentRectA);
+    const prevB = toCollisionRect(previousRectB);
+    const currB = toCollisionRect(currentRectB);
+
+    if (!prevA || !currA || !prevB || !currB) return false;
+
+    if (rectsOverlap(prevA, prevB) || rectsOverlap(currA, currB)) {
+      return true;
+    }
+
+    const prevCenterA = {
+      x: prevA.x + prevA.width / 2,
+      y: prevA.y + prevA.height / 2,
+    };
+    const currCenterA = {
+      x: currA.x + currA.width / 2,
+      y: currA.y + currA.height / 2,
+    };
+    const prevCenterB = {
+      x: prevB.x + prevB.width / 2,
+      y: prevB.y + prevB.height / 2,
+    };
+    const currCenterB = {
+      x: currB.x + currB.width / 2,
+      y: currB.y + currB.height / 2,
+    };
+
+    const relativeStartX = prevCenterA.x - prevCenterB.x;
+    const relativeStartY = prevCenterA.y - prevCenterB.y;
+    const relativeVelocityX =
+      (currCenterA.x - prevCenterA.x) - (currCenterB.x - prevCenterB.x);
+    const relativeVelocityY =
+      (currCenterA.y - prevCenterA.y) - (currCenterB.y - prevCenterB.y);
+    const halfExtentX =
+      (Math.max(prevA.width, currA.width) + Math.max(prevB.width, currB.width)) /
+      2;
+    const halfExtentY =
+      (Math.max(prevA.height, currA.height) + Math.max(prevB.height, currB.height)) /
+      2;
+
+    const xInterval = getAxisSweepInterval(
+      relativeStartX,
+      relativeVelocityX,
+      halfExtentX
+    );
+    if (!xInterval) return false;
+
+    const yInterval = getAxisSweepInterval(
+      relativeStartY,
+      relativeVelocityY,
+      halfExtentY
+    );
+    if (!yInterval) return false;
+
+    const entryTime = Math.max(xInterval.entry, yInterval.entry);
+    const exitTime = Math.min(xInterval.exit, yInterval.exit);
+    const epsilon = 1e-9;
+
+    return (
+      entryTime <= exitTime + epsilon &&
+      exitTime >= -epsilon &&
+      entryTime <= 1 + epsilon
+    );
+  }
+
   const api = {
     buildGhostPathSnapshot,
     checkRectTileCollision,
+    didRectsCollideDuringStep,
     computeBlinkyTargetTile,
     computeClydeTargetTile,
     computeCruiseElroyPhase,
@@ -634,6 +764,7 @@
     nextGhostEatChain,
     pickGhostDirection,
     pickFarthestTarget,
+    rectsOverlap,
     shouldAwardBonusLife,
     shouldReleaseGhostFromHouse,
     updateHighScore,

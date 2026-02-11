@@ -2096,20 +2096,93 @@ function tryConsumeFruit() {
   playGameSfx("fruit");
 }
 
-function getCollidingGhostIndices() {
+function snapshotCollisionRect(source) {
+  if (!source) return null;
+
+  const x = Number(source.x);
+  const y = Number(source.y);
+  const width = Number(source.width);
+  const height = Number(source.height);
+
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return null;
+  }
+
+  return { x, y, width, height };
+}
+
+function rectsOverlap(rectA, rectB) {
+  if (!rectA || !rectB) return false;
+
+  return (
+    rectA.x < rectB.x + rectB.width &&
+    rectA.x + rectA.width > rectB.x &&
+    rectA.y < rectB.y + rectB.height &&
+    rectA.y + rectA.height > rectB.y
+  );
+}
+
+function getCollidingGhostIndices(options = {}) {
   const colliding = { dangerous: [], frightened: [] };
+  if (!pacman) return colliding;
+
+  const utils = getGameplayUtils();
+  const overlapFn =
+    utils && typeof utils.rectsOverlap === "function"
+      ? utils.rectsOverlap
+      : rectsOverlap;
+  const canCheckSweptCollision =
+    utils && typeof utils.didRectsCollideDuringStep === "function";
+  const currentPacmanRect = snapshotCollisionRect(pacman);
+  const previousPacmanRect = snapshotCollisionRect(options.previousPacmanRect);
+  const previousGhostRects = Array.isArray(options.previousGhostRects)
+    ? options.previousGhostRects
+    : [];
   const pacX = pacman.getMapX();
   const pacY = pacman.getMapY();
 
   for (let i = 0; i < ghosts.length; i++) {
     const ghost = ghosts[i];
     if (!ghost) continue;
+    if (ghost.isEaten()) continue;
 
-    if (ghost.getMapX() !== pacX || ghost.getMapY() !== pacY) {
-      continue;
+    const currentGhostRect = snapshotCollisionRect(ghost);
+    let collided = false;
+
+    if (currentPacmanRect && currentGhostRect) {
+      collided = overlapFn(currentPacmanRect, currentGhostRect);
     }
 
-    if (ghost.isEaten()) continue;
+    if (!collided && ghost.getMapX() === pacX && ghost.getMapY() === pacY) {
+      collided = true;
+    }
+
+    if (
+      !collided &&
+      canCheckSweptCollision &&
+      currentPacmanRect &&
+      currentGhostRect &&
+      previousPacmanRect
+    ) {
+      const previousGhostRect = snapshotCollisionRect(previousGhostRects[i]);
+      if (previousGhostRect) {
+        collided = utils.didRectsCollideDuringStep({
+          previousRectA: previousPacmanRect,
+          currentRectA: currentPacmanRect,
+          previousRectB: previousGhostRect,
+          currentRectB: currentGhostRect,
+        });
+      }
+    }
+
+    if (!collided) continue;
 
     if (isGhostFrightened() && ghost.isFrightened()) {
       colliding.frightened.push(i);
@@ -3082,6 +3155,12 @@ function updatePopups() {
 function updateGameplay() {
   if (!pacman) return;
 
+  const previousPacmanRect = snapshotCollisionRect(pacman);
+  const previousGhostRects = new Array(ghosts.length);
+  for (let i = 0; i < ghosts.length; i++) {
+    previousGhostRects[i] = snapshotCollisionRect(ghosts[i]);
+  }
+
   pacman.moveProcess();
   const eatResult = pacman.eat();
 
@@ -3109,7 +3188,10 @@ function updateGameplay() {
   tryConsumeFruit();
   updateGhosts();
 
-  const colliding = getCollidingGhostIndices();
+  const colliding = getCollidingGhostIndices({
+    previousPacmanRect,
+    previousGhostRects,
+  });
   if (colliding.frightened.length > 0) {
     eatCollidingGhosts(colliding.frightened);
   }

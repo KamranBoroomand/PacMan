@@ -138,6 +138,45 @@ test("checkRectTileCollision supports horizontal tunnel overflow when enabled", 
   );
 });
 
+test("rectsOverlap returns true only when rectangles overlap by area", () => {
+  assert.equal(
+    gameplayUtils.rectsOverlap(
+      { x: 0, y: 0, width: 10, height: 10 },
+      { x: 9, y: 2, width: 8, height: 8 }
+    ),
+    true
+  );
+  assert.equal(
+    gameplayUtils.rectsOverlap(
+      { x: 0, y: 0, width: 10, height: 10 },
+      { x: 10, y: 0, width: 10, height: 10 }
+    ),
+    false
+  );
+});
+
+test("didRectsCollideDuringStep catches pass-through swaps", () => {
+  const collided = gameplayUtils.didRectsCollideDuringStep({
+    previousRectA: { x: 0, y: 0, width: 10, height: 10 },
+    currentRectA: { x: 20, y: 0, width: 10, height: 10 },
+    previousRectB: { x: 20, y: 0, width: 10, height: 10 },
+    currentRectB: { x: 0, y: 0, width: 10, height: 10 },
+  });
+
+  assert.equal(collided, true);
+});
+
+test("didRectsCollideDuringStep returns false for separated movement", () => {
+  const collided = gameplayUtils.didRectsCollideDuringStep({
+    previousRectA: { x: 0, y: 0, width: 10, height: 10 },
+    currentRectA: { x: 10, y: 0, width: 10, height: 10 },
+    previousRectB: { x: 40, y: 30, width: 10, height: 10 },
+    currentRectB: { x: 50, y: 30, width: 10, height: 10 },
+  });
+
+  assert.equal(collided, false);
+});
+
 test("level tuning increases speed and shrinks frightened time", () => {
   const l1 = gameplayUtils.getLevelTuning(1);
   const l8 = gameplayUtils.getLevelTuning(8);
