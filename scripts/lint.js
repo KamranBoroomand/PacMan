@@ -107,8 +107,8 @@ if (!fs.existsSync(path.join(projectRoot, "manifest.webmanifest"))) {
 if (!fs.existsSync(path.join(projectRoot, "service-worker.js"))) {
   fail("[pwa] service-worker.js file is missing.");
 }
-if (!fs.existsSync(path.join(projectRoot, ".github/workflows/preview-checks.yml"))) {
-  fail("[release] Preview checks workflow is missing.");
+if (!fs.existsSync(path.join(projectRoot, ".github/workflows/quality-checks.yml"))) {
+  fail("[release] Quality checks workflow is missing.");
 }
 if (!fs.existsSync(path.join(projectRoot, ".github/workflows/release.yml"))) {
   fail("[release] Release workflow is missing.");

@@ -71,12 +71,12 @@ test("pwa files exist and include offline cache", () => {
   assert.match(sw, /addEventListener\("fetch"/);
 });
 
-test("release and preview workflows are present", () => {
-  const previewWorkflow = read(".github/workflows/preview-checks.yml");
+test("release and quality workflows are present", () => {
+  const qualityWorkflow = read(".github/workflows/quality-checks.yml");
   const releaseWorkflow = read(".github/workflows/release.yml");
 
-  assert.match(previewWorkflow, /Preview Checks/);
-  assert.match(previewWorkflow, /test:e2e/);
+  assert.match(qualityWorkflow, /Quality Checks/);
+  assert.match(qualityWorkflow, /test:e2e/);
   assert.match(releaseWorkflow, /workflow_dispatch/);
   assert.match(releaseWorkflow, /Generate changelog/);
   assert.match(releaseWorkflow, /action-gh-release/);

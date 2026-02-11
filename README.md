@@ -21,10 +21,10 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - Gameplay includes arcade-style ghost personalities, scatter/chase/frightened cycles, level progression, and score/lives/high-score HUD.
 - Desktop and mobile input are both supported (keyboard rebinding, touch buttons, virtual stick, and gamepad support).
 
-![PacMan preview](images/pacman-preview.png)
+![PacMan gameplay](images/pacman-share.png)
 
 ## Core Features
-- Classic maze layout (`28 x 31` tiles) with walls, pellets, and corner power pellets.
+- Classic maze layout (`44 x 31` tiles) with walls, pellets, power pellets, and side-wrap tunnels.
 - Responsive canvas scaling with device-pixel-ratio support for crisp rendering.
 - Pac-Man movement with wall collision checks and tunnel wrap logic.
 - Arcade-accurate ghost behavior with per-ghost targeting logic:
@@ -46,7 +46,7 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
   - Offline caching with `service-worker.js`.
 - CI/release upgrades:
   - Unit + e2e test workflows.
-  - Preview artifact workflow.
+  - Deployable site artifact workflow.
   - Manual release tagging/changelog workflow.
 
 ## Tech Stack
@@ -69,7 +69,7 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - `tests/e2e/*.spec.js`: Playwright browser regression tests.
 - `playwright.config.js`: Playwright config with local static web server.
 - `.github/workflows/ci.yml`: Lint + unit tests on push/PR.
-- `.github/workflows/preview-checks.yml`: Preview lint/unit/e2e checks + upload preview artifact.
+- `.github/workflows/quality-checks.yml`: Lint/unit/e2e checks + upload site artifact.
 - `.github/workflows/release.yml`: Manual tag + changelog + GitHub release workflow.
 
 ### Runtime Flow
@@ -159,4 +159,4 @@ Typical GitHub Pages flow:
 - [x] Stronger regression protection with gameplay unit tests and Playwright e2e tests.
 - [x] Performance/compatibility pass with 60 FPS loop and hot-path optimizations.
 - [x] PWA/offline packaging with manifest + service worker.
-- [x] Release workflow polish with preview checks and automated tag/changelog release flow.
+- [x] Release workflow polish with quality checks and automated tag/changelog release flow.

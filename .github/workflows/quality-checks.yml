@@ -1,12 +1,12 @@
-name: Preview Checks
+name: Quality Checks
 
 on:
   pull_request:
   workflow_dispatch:
 
 jobs:
-  preview-quality:
-    name: Preview Lint, Unit, and E2E
+  quality:
+    name: Lint, Unit, and E2E
     runs-on: ubuntu-latest
 
     steps:
@@ -30,10 +30,10 @@ jobs:
       - name: E2E tests
         run: npm run test:e2e
 
-  preview-artifact:
-    name: Build Preview Artifact
+  site-artifact:
+    name: Build Site Artifact
     runs-on: ubuntu-latest
-    needs: preview-quality
+    needs: quality
 
     steps:
       - name: Checkout
@@ -41,11 +41,11 @@ jobs:
 
       - name: Bundle static site
         run: |
-          mkdir -p preview-dist
-          cp -R index.html css scripts images manifest.webmanifest service-worker.js CNAME LICENSE README.md preview-dist/
+          mkdir -p site-dist
+          cp -R index.html css scripts images manifest.webmanifest service-worker.js CNAME LICENSE README.md site-dist/
 
-      - name: Upload preview artifact
+      - name: Upload site artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pacman-preview-site
-          path: preview-dist
+          name: pacman-site
+          path: site-dist
