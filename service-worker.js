@@ -1,9 +1,11 @@
-const CACHE_NAME = "pacman-static-v5";
+const CACHE_NAME = "pacman-static-v6";
 const ASSETS = [
   "./",
   "./index.html",
+  "./preview.html",
   "./manifest.webmanifest",
   "./css/style.css",
+  "./css/preview.css",
   "./scripts/gameplay-utils.js",
   "./scripts/pacman.js",
   "./scripts/ghost.js",
