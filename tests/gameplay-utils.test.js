@@ -110,6 +110,34 @@ test("checkRectTileCollision returns collision status for walls and bounds", () 
   assert.equal(gameplayUtils.checkRectTileCollision(map, -1, 10, 8, 8, 10), true);
 });
 
+test("checkRectTileCollision supports horizontal tunnel overflow when enabled", () => {
+  const map = [
+    [1, 1, 1, 1, 1],
+    [0, 0, 0, 0, 0],
+    [1, 1, 1, 1, 1],
+  ];
+
+  assert.equal(gameplayUtils.checkRectTileCollision(map, -1, 10, 8, 8, 10), true);
+  assert.equal(
+    gameplayUtils.checkRectTileCollision(map, -1, 10, 8, 8, 10, {
+      allowHorizontalTunnelWrap: true,
+    }),
+    false
+  );
+  assert.equal(
+    gameplayUtils.checkRectTileCollision(map, 43, 10, 8, 8, 10, {
+      allowHorizontalTunnelWrap: true,
+    }),
+    false
+  );
+  assert.equal(
+    gameplayUtils.checkRectTileCollision(map, -1, 0, 8, 8, 10, {
+      allowHorizontalTunnelWrap: true,
+    }),
+    true
+  );
+});
+
 test("level tuning increases speed and shrinks frightened time", () => {
   const l1 = gameplayUtils.getLevelTuning(1);
   const l8 = gameplayUtils.getLevelTuning(8);

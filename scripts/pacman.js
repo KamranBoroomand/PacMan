@@ -118,26 +118,65 @@ class Pacman {
     }
 
     checkCollisions() {
+        const utils =
+            typeof GameplayUtils === "object" && GameplayUtils
+                ? GameplayUtils
+                : null;
+
+        if (utils && typeof utils.checkRectTileCollision === "function") {
+            return utils.checkRectTileCollision(
+                map,
+                this.x,
+                this.y,
+                this.width,
+                this.height,
+                oneBlockSize,
+                { allowHorizontalTunnelWrap: true }
+            );
+        }
+
         const top = Math.floor(this.y / oneBlockSize);
         const left = Math.floor(this.x / oneBlockSize);
         const bottom = Math.floor((this.y + this.height - 1) / oneBlockSize);
         const right = Math.floor((this.x + this.width - 1) / oneBlockSize);
+        const tileRows = map.length;
+        const tileCols = map[0].length;
 
-        if (
-            top < 0 ||
-            left < 0 ||
-            bottom >= map.length ||
-            right >= map[0].length
-        ) {
+        if (top < 0 || bottom >= tileRows) {
             return true;
         }
 
-        return (
-            map[top][left] == 1 ||
-            map[bottom][left] == 1 ||
-            map[top][right] == 1 ||
-            map[bottom][right] == 1
-        );
+        const outOfHorizontalBounds = left < 0 || right >= tileCols;
+        if (outOfHorizontalBounds) {
+            const centerY = Math.floor((this.y + this.height / 2) / oneBlockSize);
+            const isTunnelRow =
+                centerY >= 0 &&
+                centerY < tileRows &&
+                map[centerY][0] !== 1 &&
+                map[centerY][tileCols - 1] !== 1;
+            if (!isTunnelRow) {
+                return true;
+            }
+        }
+
+        const corners = [
+            { x: left, y: top },
+            { x: left, y: bottom },
+            { x: right, y: top },
+            { x: right, y: bottom },
+        ];
+
+        for (let i = 0; i < corners.length; i++) {
+            const corner = corners[i];
+            if (corner.x < 0 || corner.x >= tileCols) {
+                continue;
+            }
+            if (map[corner.y][corner.x] === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     checkGhostCollision(ghosts) {

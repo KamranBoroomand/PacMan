@@ -410,26 +410,66 @@
     return safeMilestone + safeStep;
   }
 
-  function checkRectTileCollision(map, x, y, width, height, blockSize) {
+  function checkRectTileCollision(
+    map,
+    x,
+    y,
+    width,
+    height,
+    blockSize,
+    options = {}
+  ) {
     if (!Array.isArray(map) || map.length === 0) return true;
     const tileRows = map.length;
     const tileCols = map[0].length;
+    const allowHorizontalTunnelWrap = Boolean(
+      options && options.allowHorizontalTunnelWrap
+    );
 
     const top = Math.floor(y / blockSize);
     const left = Math.floor(x / blockSize);
     const bottom = Math.floor((y + height - 1) / blockSize);
     const right = Math.floor((x + width - 1) / blockSize);
 
-    if (top < 0 || left < 0 || bottom >= tileRows || right >= tileCols) {
+    if (top < 0 || bottom >= tileRows) {
       return true;
     }
 
-    return (
-      map[top][left] === 1 ||
-      map[bottom][left] === 1 ||
-      map[top][right] === 1 ||
-      map[bottom][right] === 1
-    );
+    const outOfHorizontalBounds = left < 0 || right >= tileCols;
+    if (outOfHorizontalBounds) {
+      if (!allowHorizontalTunnelWrap) {
+        return true;
+      }
+
+      const centerY = Math.floor((y + height / 2) / blockSize);
+      const isTunnelRow =
+        centerY >= 0 &&
+        centerY < tileRows &&
+        map[centerY][0] !== 1 &&
+        map[centerY][tileCols - 1] !== 1;
+      if (!isTunnelRow) {
+        return true;
+      }
+    }
+
+    const corners = [
+      { x: left, y: top },
+      { x: left, y: bottom },
+      { x: right, y: top },
+      { x: right, y: bottom },
+    ];
+
+    for (let i = 0; i < corners.length; i++) {
+      const corner = corners[i];
+      if (corner.x < 0 || corner.x >= tileCols) {
+        continue;
+      }
+      if (map[corner.y][corner.x] === 1) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   const api = {
