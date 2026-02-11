@@ -43,13 +43,13 @@ class Ghost {
         };
 
         this.target = randomTargetsForGhosts[0];
+        const randomFn = typeof randomFloat === "function" ? randomFloat : Math.random;
         this.randomTargetIndex = parseInt(
-            Math.random() * randomTargetsForGhosts.length,
+            randomFn() * randomTargetsForGhosts.length,
             10
         );
-        this.directionTimer = setInterval(() => {
-            this.changeRandomDirection();
-        }, 10000);
+        this.directionTimer = null;
+        this.frightenedTurnsRemaining = 0;
     }
 
     dispose() {
@@ -119,6 +119,13 @@ class Ghost {
         const nextState = enabled ? "frightened" : "normal";
         if (this.state !== nextState) {
             this.reverseDirection();
+            if (enabled) {
+                const limit =
+                    typeof getFrightenedTurnLimit === "function"
+                        ? getFrightenedTurnLimit()
+                        : 6;
+                this.frightenedTurnsRemaining = Math.max(0, limit);
+            }
         }
         this.setState(nextState);
     }
@@ -564,7 +571,8 @@ class Ghost {
             return candidates[0];
         }
 
-        const index = Math.floor(Math.random() * candidates.length);
+        const randomFn = typeof randomFloat === "function" ? randomFloat : Math.random;
+        const index = Math.floor(randomFn() * candidates.length);
         return candidates[index];
     }
 
@@ -678,7 +686,20 @@ class Ghost {
         }
 
         if (this.isFrightened() && !this.isEaten()) {
-            return this.pickRandomDirection(candidates);
+            const canContinue = candidates.includes(this.direction);
+            if (this.frightenedTurnsRemaining <= 0 && canContinue) {
+                return this.direction;
+            }
+
+            const picked = this.pickRandomDirection(candidates);
+            const atIntersection = availableDirections.length > 2;
+            if (picked !== this.direction && atIntersection) {
+                this.frightenedTurnsRemaining = Math.max(
+                    0,
+                    this.frightenedTurnsRemaining - 1
+                );
+            }
+            return picked;
         }
 
         return this.pickDirectionClosestToTarget(

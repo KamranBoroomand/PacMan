@@ -41,4 +41,19 @@ test("settings persist through reload", async ({ page }) => {
   const mobileInputMode = page.locator("#mobile-input-mode");
   await mobileInputMode.selectOption("stick");
   await expect(mobileInputMode).toHaveValue("stick");
+
+  const challengeMode = page.locator("#challenge-mode");
+  await challengeMode.selectOption("time-attack");
+  await expect(challengeMode).toHaveValue("time-attack");
+
+  await page.reload();
+  await page.getByText("Settings", { exact: true }).click();
+  await expect(page.locator("#challenge-mode")).toHaveValue("time-attack");
+});
+
+test("replay button exists and starts disabled", async ({ page }) => {
+  await page.goto("/");
+  const replayButton = page.locator("#replay-last");
+  await expect(replayButton).toBeVisible();
+  await expect(replayButton).toBeDisabled();
 });

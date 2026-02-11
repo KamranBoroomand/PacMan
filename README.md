@@ -9,6 +9,7 @@ A fully static, retro-style Pac-Man browser game with responsive canvas renderin
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Scripts](#scripts)
+- [Contributor Testing Guide](#contributor-testing-guide)
 - [Deployment](#deployment)
 - [Security/Quality Notes](#securityquality-notes)
 - [Roadmap](#roadmap)
@@ -18,7 +19,7 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 
 - No build system or backend is required.
 - The game runs entirely in the browser via a `<canvas>`.
-- Gameplay includes arcade-style ghost personalities, scatter/chase/frightened cycles, level progression, and score/lives/high-score HUD.
+- Gameplay includes arcade-style ghost personalities, Cruise Elroy phases, per-level scatter/chase parity tables, challenge modes, replay playback, and cutscene transitions.
 - Desktop and mobile input are both supported (keyboard rebinding, touch buttons, virtual stick, and gamepad support).
 
 ![PacMan gameplay](images/pacman-share.png)
@@ -32,10 +33,18 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - Scatter/chase cycle schedule with frightened overrides and ghost-house release rules.
 - Level progression with per-level speed/difficulty tuning, fruit table scoring, and bonus-life milestones.
 - Full round-state flow: start screen, ready phase, death phase, intermission, and game-over state.
+- Attract mode: automatic demo playback starts after start-screen idle timeout.
+- Classic-style level cutscenes with Start-key skip support.
 - HUD upgrades: level indicator, ghost mode indicator, fruit label, ghost-eat point popups, and overlay improvements.
 - Configurable settings panel with:
-  - Volume control, mute, key rebinding, and mobile input mode selection.
+  - Volume control, mute, key rebinding, challenge mode select, and mobile input mode selection.
+  - Accessibility controls: color-blind/high-contrast palette, reduced motion, and large HUD text.
   - Persistent settings via `localStorage`.
+- Replay system:
+  - Deterministic run seed + per-frame action capture.
+  - Replay button to rerun the last completed attempt.
+- Challenge modes:
+  - Classic, Time Attack, No Power Pellets, and One Life.
 - Expanded input support:
   - Keyboard, touch buttons, swipe, virtual stick, and gamepad.
 - Runtime/performance updates:
@@ -43,11 +52,13 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
   - Cached wall tiles and reduced per-frame overhead in hot paths.
 - PWA support:
   - Installable app via `manifest.webmanifest`.
-  - Offline caching with `service-worker.js`.
+  - Offline caching with versioned static/runtime caches.
+  - In-app update-ready prompt wired to `skipWaiting`.
 - CI/release upgrades:
   - Unit + e2e test workflows.
+  - Optional visual snapshot Playwright specs.
   - Deployable site artifact workflow.
-  - Manual release tagging/changelog workflow.
+  - Manual release tagging with semantic-version validation and categorized changelog workflow.
 
 ## Tech Stack
 - HTML5
@@ -73,10 +84,20 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - `.github/workflows/release.yml`: Manual tag + changelog + GitHub release workflow.
 
 ### Runtime Flow
-1. `game.js` initializes map state, Pac-Man, ghosts, fruit timers, and starts the interval loop.
-2. Each frame runs `update()` then `draw()`.
-3. `update()` applies movement, collision resolution, food/fruit consumption, ghost interaction, and win/lose checks.
-4. `draw()` renders walls, pellets, fruit, ghosts, Pac-Man, popups, score/lives/high-score, level/mode HUD, and phase overlays.
+1. `game.js` initializes map state, actors, level tuning, replay seed, and UI handlers.
+2. Each animation frame advances a fixed-step simulation (`update`) then renders (`draw`).
+3. `update` runs input (keyboard/touch/gamepad/replay), phase transitions, challenge timers, AI mode updates, collisions, and scoring.
+4. `draw` renders map layers, entities, HUD, popups, cutscenes, and overlays.
+
+```mermaid
+flowchart LR
+  A["Input Sources (Keyboard/Touch/Gamepad/Replay)"] --> B["update() Fixed Step"]
+  B --> C["Phase State Machine"]
+  C --> D["Gameplay Systems (AI, Collisions, Fruit, Scoring)"]
+  D --> E["Replay Recorder + Challenge Rules"]
+  E --> F["draw()"]
+  F --> G["Canvas + HUD + Overlays"]
+```
 
 ## Quick Start
 ### Option A: Open Directly
@@ -120,13 +141,37 @@ npm test
 npm run test:e2e
 npm run check
 npm run check:all
+PLAYWRIGHT_VISUAL=1 npm run test:e2e
 ```
 
 - `npm run lint`: Syntax + structural lint checks (`scripts/lint.js`).
 - `npm test` / `npm run test:unit`: Unit/regression tests (`tests/*.test.js`) using Node's built-in test runner.
 - `npm run test:e2e`: Browser end-to-end tests with Playwright (`tests/e2e/*.spec.js`).
+- `PLAYWRIGHT_VISUAL=1 npm run test:e2e`: Enables visual snapshot assertions in `tests/e2e/visual.spec.js`.
 - `npm run check`: Runs lint + unit tests.
 - `npm run check:all`: Runs lint + unit + e2e tests.
+
+## Contributor Testing Guide
+1. Run fast checks before every commit:
+   ```bash
+   npm run check
+   ```
+2. Run browser regression checks before opening a PR:
+   ```bash
+   npm run test:e2e
+   ```
+3. Run visual snapshot checks when UI/animation/HUD changes:
+   ```bash
+   PLAYWRIGHT_VISUAL=1 npm run test:e2e
+   ```
+4. If visual tests fail after intentional UI change, update snapshots with:
+   ```bash
+   PLAYWRIGHT_VISUAL=1 npx playwright test --update-snapshots
+   ```
+5. Validate release readiness locally:
+   ```bash
+   npm run check
+   ```
 
 ## Deployment
 This project is static and can be deployed to any static host.
@@ -160,3 +205,13 @@ Typical GitHub Pages flow:
 - [x] Performance/compatibility pass with 60 FPS loop and hot-path optimizations.
 - [x] PWA/offline packaging with manifest + service worker.
 - [x] Release workflow polish with quality checks and automated tag/changelog release flow.
+- [x] Arcade-parity deepening with Cruise Elroy phases, per-level mode schedules, and frightened-turn limits.
+- [x] Idle attract mode with demo playback.
+- [x] Intermission cutscenes with skip support.
+- [x] Challenge modes: time attack, no-power-pellet, and one-life run.
+- [x] Replay system with deterministic seed + recorded input playback.
+- [x] Accessibility pass with palette options, reduced motion, and larger HUD text.
+- [x] Expanded regression coverage with deterministic utility tests and optional Playwright visual snapshots.
+- [x] PWA update UX with cache versioning and install/update analytics hooks.
+- [x] Release hardening with semantic version validation and categorized changelog generation.
+- [x] Documentation refresh with architecture flow and contributor testing guide.

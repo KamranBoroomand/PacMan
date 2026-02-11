@@ -229,3 +229,33 @@ test("pickGhostDirection prefers continuing direction on equal scores", () => {
 
   assert.equal(direction, 2);
 });
+
+test("getGhostModeScheduleForLevel returns advanced schedule for high levels", () => {
+  const level1 = gameplayUtils.getGhostModeScheduleForLevel(1);
+  const level6 = gameplayUtils.getGhostModeScheduleForLevel(6);
+  const level99 = gameplayUtils.getGhostModeScheduleForLevel(99);
+
+  assert.ok(Array.isArray(level1));
+  assert.ok(Array.isArray(level6));
+  assert.ok(Array.isArray(level99));
+  assert.ok(level6.length <= level1.length);
+});
+
+test("computeCruiseElroyPhase resolves phases by remaining dots", () => {
+  assert.equal(gameplayUtils.computeCruiseElroyPhase(80, 40, 20), 0);
+  assert.equal(gameplayUtils.computeCruiseElroyPhase(40, 40, 20), 1);
+  assert.equal(gameplayUtils.computeCruiseElroyPhase(18, 40, 20), 2);
+});
+
+test("createSeededRandom yields deterministic sequence", () => {
+  const a = gameplayUtils.createSeededRandom(123);
+  const b = gameplayUtils.createSeededRandom(123);
+  const c = gameplayUtils.createSeededRandom(456);
+
+  const aValues = [a(), a(), a()];
+  const bValues = [b(), b(), b()];
+  const cValues = [c(), c(), c()];
+
+  assert.deepEqual(aValues, bValues);
+  assert.notDeepEqual(aValues, cValues);
+});

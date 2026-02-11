@@ -1,12 +1,15 @@
 {
   "name": "PacMan",
   "short_name": "PacMan",
+  "id": "/?source=pwa",
   "description": "Retro arcade Pac-Man in your browser.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#000000",
   "theme_color": "#000000",
+  "categories": ["games", "entertainment"],
   "icons": [
     {
       "src": "images/pacman favicon.png",
@@ -16,6 +19,13 @@
     {
       "src": "images/pacman favicon.png",
       "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "images/pacman-share.png",
+      "sizes": "1200x630",
       "type": "image/png"
     }
   ]

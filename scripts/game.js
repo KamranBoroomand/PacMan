@@ -8,8 +8,14 @@ const restartGameButton = document.getElementById("restart-game");
 const muteToggleButton = document.getElementById("mute-toggle");
 const arcadeViewToggleButton = document.getElementById("arcade-view-toggle");
 const installAppButton = document.getElementById("install-app");
+const updateAppButton = document.getElementById("update-app");
+const replayLastButton = document.getElementById("replay-last");
 const volumeControl = document.getElementById("volume-control");
 const mobileInputModeSelect = document.getElementById("mobile-input-mode");
+const challengeModeSelect = document.getElementById("challenge-mode");
+const paletteModeSelect = document.getElementById("palette-mode");
+const reducedMotionToggle = document.getElementById("reduced-motion");
+const largeHudToggle = document.getElementById("large-hud");
 const settingsPanel = document.getElementById("settings-panel");
 const keybindButtons = Array.from(document.querySelectorAll(".keybind-btn[data-action]"));
 const keybindHelp = document.getElementById("keybind-help");
@@ -32,6 +38,7 @@ const GAME_PHASE_PLAYING = "playing";
 const GAME_PHASE_PAUSED = "paused";
 const GAME_PHASE_DYING = "dying";
 const GAME_PHASE_INTERMISSION = "intermission";
+const GAME_PHASE_CUTSCENE = "cutscene";
 const GAME_PHASE_GAMEOVER = "gameover";
 
 const HUD_ROWS = 2;
@@ -45,6 +52,8 @@ const STICK_DEAD_ZONE = 14;
 const ROUND_READY_MS = 1800;
 const LIFE_LOSS_MS = 1100;
 const INTERMISSION_MS = 1500;
+const ATTRACT_IDLE_MS = 7000;
+const CHALLENGE_TIME_ATTACK_SECONDS = 120;
 const FRIGHTENED_FLASH_WINDOW_MS = 2200;
 const FRIGHTENED_FLASH_INTERVAL_MS = 180;
 const MIN_FRUIT_SPAWN_DISTANCE = 8;
@@ -61,6 +70,7 @@ const GHOST_HOUSE_EXIT_BY_PERSONALITY = {
   clyde: { x: 21, y: 12 },
 };
 const BASE_AUDIO_GAIN = 0.25;
+const ANALYTICS_EVENT_NAME = "pacman:analytics";
 const GHOST_MODE_SCHEDULE = [
   { mode: "scatter", durationMs: 7000 },
   { mode: "chase", durationMs: 20000 },
@@ -71,6 +81,136 @@ const GHOST_MODE_SCHEDULE = [
   { mode: "scatter", durationMs: 5000 },
   { mode: "chase", durationMs: Infinity },
 ];
+
+const GHOST_MODE_SCHEDULE_BY_LEVEL = [
+  GHOST_MODE_SCHEDULE,
+  GHOST_MODE_SCHEDULE,
+  GHOST_MODE_SCHEDULE,
+  [
+    { mode: "scatter", durationMs: 5000 },
+    { mode: "chase", durationMs: 20000 },
+    { mode: "scatter", durationMs: 5000 },
+    { mode: "chase", durationMs: 20000 },
+    { mode: "scatter", durationMs: 5000 },
+    { mode: "chase", durationMs: 20000 },
+    { mode: "scatter", durationMs: 5000 },
+    { mode: "chase", durationMs: Infinity },
+  ],
+  [
+    { mode: "scatter", durationMs: 5000 },
+    { mode: "chase", durationMs: 20000 },
+    { mode: "scatter", durationMs: 5000 },
+    { mode: "chase", durationMs: 20000 },
+    { mode: "scatter", durationMs: 5000 },
+    { mode: "chase", durationMs: Infinity },
+  ],
+  [
+    { mode: "scatter", durationMs: 5000 },
+    { mode: "chase", durationMs: 20000 },
+    { mode: "scatter", durationMs: 5000 },
+    { mode: "chase", durationMs: 1033000 },
+    { mode: "scatter", durationMs: 17 },
+    { mode: "chase", durationMs: Infinity },
+  ],
+];
+
+const CUTSCENES_BY_LEVEL = {
+  2: {
+    title: "Act 1",
+    subtitle: "Blinky chases Pac-Man",
+    durationMs: 4400,
+    tone: "amber",
+  },
+  5: {
+    title: "Act 2",
+    subtitle: "Blinky slows, Pac-Man flips momentum",
+    durationMs: 4600,
+    tone: "cyan",
+  },
+  9: {
+    title: "Act 3",
+    subtitle: "Fast chase finale",
+    durationMs: 4800,
+    tone: "rose",
+  },
+};
+
+const ATTRACT_DEMO_INPUTS = [
+  { frame: 4, action: "right" },
+  { frame: 40, action: "right" },
+  { frame: 72, action: "up" },
+  { frame: 118, action: "left" },
+  { frame: 190, action: "left" },
+  { frame: 242, action: "down" },
+  { frame: 310, action: "right" },
+  { frame: 378, action: "right" },
+  { frame: 430, action: "down" },
+  { frame: 480, action: "left" },
+  { frame: 548, action: "left" },
+  { frame: 606, action: "up" },
+  { frame: 660, action: "right" },
+];
+
+const CHALLENGE_MODES = {
+  CLASSIC: "classic",
+  TIME_ATTACK: "time-attack",
+  NO_POWER: "no-power",
+  ONE_LIFE: "one-life",
+};
+
+const COLOR_PALETTES = {
+  classic: {
+    background: "black",
+    wallOuter: "#342DCA",
+    wallInner: "black",
+    pellet: "#FEB897",
+    powerPellet: "#F7FF8A",
+    textPrimary: "white",
+    textHigh: "#FFE16A",
+    textAccent: "#B8D8FF",
+    textMode: "#78F7FF",
+    textFruit: "#FFC95A",
+    toastBonus: "#78F7FF",
+    popupGhost: "#78F7FF",
+    popupFruit: "#FFE16A",
+    overlayTitle: "#FFDE00",
+    overlaySubtitle: "#DDE7FF",
+  },
+  colorblind: {
+    background: "#05080f",
+    wallOuter: "#1E50FF",
+    wallInner: "#09121D",
+    pellet: "#FFDEA6",
+    powerPellet: "#F5FF7B",
+    textPrimary: "#F3F7FF",
+    textHigh: "#FFE178",
+    textAccent: "#ADD4FF",
+    textMode: "#7EEBFF",
+    textFruit: "#FFD089",
+    toastBonus: "#84F2FF",
+    popupGhost: "#84F2FF",
+    popupFruit: "#FFE178",
+    overlayTitle: "#FFE178",
+    overlaySubtitle: "#E4EFFF",
+  },
+  "high-contrast": {
+    background: "#000000",
+    wallOuter: "#4E6BFF",
+    wallInner: "#000000",
+    pellet: "#FFFFFF",
+    powerPellet: "#FFFFFF",
+    textPrimary: "#FFFFFF",
+    textHigh: "#FFFF66",
+    textAccent: "#CFE1FF",
+    textMode: "#7CFFFF",
+    textFruit: "#FFD700",
+    toastBonus: "#7CFFFF",
+    popupGhost: "#7CFFFF",
+    popupFruit: "#FFFF66",
+    overlayTitle: "#FFFF66",
+    overlaySubtitle: "#FFFFFF",
+  },
+};
 
 const GHOST_DEFINITIONS = [
   {
@@ -148,6 +288,10 @@ const DEFAULT_SETTINGS = {
   muted: false,
   volume: 70,
   mobileInputMode: "buttons",
+  challengeMode: CHALLENGE_MODES.CLASSIC,
+  paletteMode: "classic",
+  reducedMotion: false,
+  largeHud: false,
   keybinds: { ...DEFAULT_KEYBINDS },
 };
 
@@ -203,12 +347,14 @@ let nextBonusLifeScore = BONUS_LIFE_STEP;
 let phase = GAME_PHASE_START;
 let phaseUntil = 0;
 let phaseMessage = "Press Start";
+let phaseMessageSecondary = "";
 let roundStartAt = 0;
 let frightenedUntil = 0;
 let ghostEatChain = 0;
 let ghostGlobalMode = "scatter";
 let lastGhostGlobalMode = "scatter";
 let currentLevelTuning = null;
+let currentGhostModeSchedule = GHOST_MODE_SCHEDULE;
 let dotsEatenThisRound = 0;
 let remainingFoodCount = 0;
 let initialFoodCount = 0;
@@ -228,7 +374,21 @@ let arcadeViewEnabled = false;
 let audioContext = null;
 let audioMasterGain = null;
 let deferredInstallPrompt = null;
+let swRegistration = null;
+let swUpdateReady = false;
 let gamepadButtonsState = [];
+let challengeTimeRemainingMs = CHALLENGE_TIME_ATTACK_SECONDS * 1000;
+let attractModeActive = false;
+let attractTriggeredThisIdleWindow = false;
+let lastUserIntentAt = performance.now();
+let challengeModeBeforeAttract = null;
+let activeCutscene = null;
+let simulationFrame = 0;
+let activeRunSeed = 1;
+let runRandomState = 1;
+let replayCurrentRun = null;
+let replayLastRun = null;
+let replayPlayback = null;
 
 let fruit = {
   active: false,
@@ -337,6 +497,122 @@ function getGameplayUtils() {
   return null;
 }
 
+function hashSeed(value) {
+  const raw = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(raw) || raw === 0) {
+    return 123456789;
+  }
+  return Math.abs(raw) % 2147483647 || 123456789;
+}
+
+function setRunRandomSeed(seed) {
+  runRandomState = hashSeed(seed);
+}
+
+function randomFloat() {
+  runRandomState = (runRandomState * 48271) % 2147483647;
+  return (runRandomState - 1) / 2147483646;
+}
+
+function randomIndex(length) {
+  if (!Number.isFinite(length) || length <= 1) return 0;
+  return Math.floor(randomFloat() * length);
+}
+
+function createRunSeed() {
+  return hashSeed(Date.now() + Math.floor(performance.now()));
+}
+
+function getCurrentPalette() {
+  return COLOR_PALETTES[settings.paletteMode] || COLOR_PALETTES.classic;
+}
+
+function trackAnalyticsEvent(eventName, detail = {}) {
+  const payload = {
+    event: String(eventName || "unknown"),
+    detail,
+    timestamp: new Date().toISOString(),
+  };
+
+  try {
+    window.dispatchEvent(new CustomEvent(ANALYTICS_EVENT_NAME, { detail: payload }));
+  } catch (error) {
+    // Ignore analytics dispatch failures.
+  }
+
+  if (Array.isArray(window.dataLayer)) {
+    window.dataLayer.push(payload);
+  }
+}
+
+function noteUserIntent() {
+  lastUserIntentAt = lastUpdateNow || performance.now();
+  attractTriggeredThisIdleWindow = false;
+
+  if (isReplayRunning()) {
+    replayPlayback = null;
+    renderReplayButton();
+    addHudToast("Replay canceled", getCurrentPalette().textMode, 900);
+  }
+
+  if (attractModeActive) {
+    attractModeActive = false;
+    if (challengeModeBeforeAttract) {
+      settings.challengeMode = challengeModeBeforeAttract;
+      challengeModeBeforeAttract = null;
+      renderSettingsUi();
+    }
+    replayPlayback = null;
+    setPhase(GAME_PHASE_START, { message: "Press Start", secondary: "Demo stopped" });
+    prepareRound();
+  }
+}
+
+function getGhostModeScheduleForLevel(levelNumber) {
+  const safe = Math.max(1, Number.parseInt(levelNumber, 10) || 1);
+  const index = Math.min(GHOST_MODE_SCHEDULE_BY_LEVEL.length - 1, safe - 1);
+  return GHOST_MODE_SCHEDULE_BY_LEVEL[index];
+}
+
+function getCruiseElroyThresholds(levelNumber, totalDots) {
+  const safeLevel = Math.max(1, Number.parseInt(levelNumber, 10) || 1);
+  const safeDots = Math.max(1, Number.parseInt(totalDots, 10) || 1);
+
+  let phase1 = Math.floor(safeDots * 0.24);
+  let phase2 = Math.floor(safeDots * 0.12);
+
+  if (safeLevel >= 3) {
+    phase1 = Math.floor(safeDots * 0.32);
+    phase2 = Math.floor(safeDots * 0.16);
+  }
+  if (safeLevel >= 7) {
+    phase1 = Math.floor(safeDots * 0.38);
+    phase2 = Math.floor(safeDots * 0.2);
+  }
+
+  return {
+    phase1: Math.max(12, phase1),
+    phase2: Math.max(6, phase2),
+  };
+}
+
+function getCruiseElroyPhase(remainingDots, thresholds) {
+  const safeRemaining = Math.max(0, Number.parseInt(remainingDots, 10) || 0);
+  if (!thresholds) return 0;
+  if (safeRemaining <= thresholds.phase2) return 2;
+  if (safeRemaining <= thresholds.phase1) return 1;
+  return 0;
+}
+
+function getFrightenedTurnLimit() {
+  if (!currentLevelTuning) return 6;
+  return Math.max(1, Number.parseInt(currentLevelTuning.frightenedTurnLimit, 10) || 6);
+}
+
+function isReplayRunning() {
+  return Boolean(replayPlayback);
+}
+
 function normalizeKeyName(value) {
   if (!value) return "";
   const lower = String(value).toLowerCase();
@@ -357,6 +633,20 @@ function formatKeyForUi(key) {
 }
 
 function validateSettings(raw) {
+  const requestedChallengeMode = raw && raw.challengeMode;
+  const challengeMode =
+    Object.values(CHALLENGE_MODES).includes(requestedChallengeMode)
+      ? requestedChallengeMode
+      : CHALLENGE_MODES.CLASSIC;
+
+  const requestedPaletteMode = raw && raw.paletteMode;
+  const paletteMode = Object.prototype.hasOwnProperty.call(
+    COLOR_PALETTES,
+    requestedPaletteMode
+  )
+    ? requestedPaletteMode
+    : "classic";
+
   const safe = {
     muted: Boolean(raw && raw.muted),
     volume: Number.isFinite(Number(raw && raw.volume))
@@ -364,6 +654,10 @@ function validateSettings(raw) {
       : DEFAULT_SETTINGS.volume,
     mobileInputMode:
       raw && raw.mobileInputMode === "stick" ? "stick" : "buttons",
+    challengeMode,
+    paletteMode,
+    reducedMotion: Boolean(raw && raw.reducedMotion),
+    largeHud: Boolean(raw && raw.largeHud),
     keybinds: { ...DEFAULT_KEYBINDS },
   };
 
@@ -481,6 +775,27 @@ function renderInstallButton() {
   }
 }
 
+function renderUpdateButton() {
+  if (!updateAppButton) return;
+  if (swUpdateReady) {
+    updateAppButton.classList.remove("hidden");
+  } else {
+    updateAppButton.classList.add("hidden");
+  }
+}
+
+function renderReplayButton() {
+  if (!replayLastButton) return;
+  const replayAvailable = Boolean(replayLastRun && Array.isArray(replayLastRun.events));
+  replayLastButton.disabled = !replayAvailable || isReplayRunning();
+  replayLastButton.textContent = isReplayRunning() ? "Replaying..." : "Replay";
+}
+
+function applyAccessibilitySettings() {
+  document.body.classList.toggle("reduced-motion", settings.reducedMotion);
+  document.body.classList.toggle("large-hud", settings.largeHud);
+}
+
 function renderArcadeViewButton() {
   if (!arcadeViewToggleButton) return;
 
@@ -537,12 +852,25 @@ function renderSettingsUi() {
   if (mobileInputModeSelect) {
     mobileInputModeSelect.value = settings.mobileInputMode;
   }
+  if (challengeModeSelect) {
+    challengeModeSelect.value = settings.challengeMode;
+  }
+  if (paletteModeSelect) {
+    paletteModeSelect.value = settings.paletteMode;
+  }
+  if (reducedMotionToggle) {
+    reducedMotionToggle.checked = Boolean(settings.reducedMotion);
+  }
+  if (largeHudToggle) {
+    largeHudToggle.checked = Boolean(settings.largeHud);
+  }
   renderKeybindButtons();
   if (keybindHelp) {
     keybindHelp.textContent = pendingRebindAction
       ? `Press a key for ${pendingRebindAction}. Esc to cancel.`
       : "Click a keybind, then press a key.";
   }
+  applyAccessibilitySettings();
 }
 
 function validateMapRectangular() {
@@ -736,8 +1064,8 @@ function getRandomWalkableTile(options = {}) {
   } = options;
 
   for (let tries = 0; tries < maxTries; tries++) {
-    const x = Math.floor(Math.random() * (maxX - minX + 1)) + minX;
-    const y = Math.floor(Math.random() * (maxY - minY + 1)) + minY;
+    const x = Math.floor(randomFloat() * (maxX - minX + 1)) + minX;
+    const y = Math.floor(randomFloat() * (maxY - minY + 1)) + minY;
 
     if (!isWalkableTile(y, x)) continue;
     if (forbidden.has(`${x},${y}`)) continue;
@@ -808,10 +1136,10 @@ function getRandomReachableTile(options = {}) {
   });
 
   if (candidates.length === 0) {
-    return reachable[Math.floor(Math.random() * reachable.length)];
+    return reachable[randomIndex(reachable.length)];
   }
 
-  return candidates[Math.floor(Math.random() * candidates.length)];
+  return candidates[randomIndex(candidates.length)];
 }
 
 function tileToPixel(tile) {
@@ -884,7 +1212,7 @@ function playGameSfx(type) {
   }
 }
 
-function addHudToast(text, color = "#FFE16A", durationMs = 1400) {
+function addHudToast(text, color = getCurrentPalette().textHigh, durationMs = 1400) {
   hudToasts.push({
     text,
     color,
@@ -909,7 +1237,13 @@ function addScore(points) {
   if (!Number.isFinite(safePoints)) return;
 
   score += safePoints;
-  syncHighScore();
+  if (!attractModeActive) {
+    syncHighScore();
+  }
+
+  const allowBonusLives =
+    settings.challengeMode !== CHALLENGE_MODES.ONE_LIFE && !attractModeActive;
+  if (!allowBonusLives) return;
 
   const utils = getGameplayUtils();
   while (
@@ -919,14 +1253,14 @@ function addScore(points) {
   ) {
     lives++;
     nextBonusLifeScore = utils.nextBonusLifeMilestone(nextBonusLifeScore, BONUS_LIFE_STEP);
-    addHudToast("1UP!", "#78F7FF", 1800);
+    addHudToast("1UP!", getCurrentPalette().toastBonus, 1800);
     playGameSfx("extraLife");
   }
 
   if (!utils && score >= nextBonusLifeScore) {
     lives++;
     nextBonusLifeScore += BONUS_LIFE_STEP;
-    addHudToast("1UP!", "#78F7FF", 1800);
+    addHudToast("1UP!", getCurrentPalette().toastBonus, 1800);
     playGameSfx("extraLife");
   }
 }
@@ -961,17 +1295,22 @@ function getLevelTuning(levelNumber) {
     frightenedDurationMs: Math.max(2200, 6800 - (safeLevel - 1) * 420),
     fruitSpawnDelayMs: Math.max(5000, 12000 - (safeLevel - 1) * 350),
     fruitVisibleMs: Math.max(4200, 10000 - (safeLevel - 1) * 220),
+    frightenedTurnLimit: Math.max(1, 7 - Math.floor((safeLevel - 1) / 2)),
+    blinkyElroyPhase1Multiplier: 1.03 + Math.min(0.05, (safeLevel - 1) * 0.005),
+    blinkyElroyPhase2Multiplier: 1.08 + Math.min(0.09, (safeLevel - 1) * 0.006),
   };
 }
 
 function applyLevelTuning(levelNumber) {
   currentLevelTuning = getLevelTuning(levelNumber);
+  currentGhostModeSchedule = getGhostModeScheduleForLevel(levelNumber);
   fps = 60;
 }
 
 function setPhase(nextPhase, options = {}) {
   phase = nextPhase;
   phaseMessage = options.message || "";
+  phaseMessageSecondary = options.secondary || "";
   phaseUntil = options.durationMs ? lastUpdateNow + options.durationMs : 0;
   renderPauseButton();
   renderStartButton();
@@ -1066,7 +1405,8 @@ function getFrightenedTargetForGhost(ghost) {
     const target = utils.pickFarthestTarget(
       randomTargetsForGhosts,
       pacman.getMapX() * oneBlockSize,
-      pacman.getMapY() * oneBlockSize
+      pacman.getMapY() * oneBlockSize,
+      randomFloat
     );
     if (target) return target;
   }
@@ -1141,7 +1481,7 @@ function updateGhostGlobalMode() {
   const elapsed = Math.max(0, lastUpdateNow - roundStartAt);
 
   if (utils && typeof utils.computeScatterChaseMode === "function") {
-    ghostGlobalMode = utils.computeScatterChaseMode(elapsed, GHOST_MODE_SCHEDULE);
+    ghostGlobalMode = utils.computeScatterChaseMode(elapsed, currentGhostModeSchedule);
   } else {
     ghostGlobalMode = elapsed < 7000 ? "scatter" : "chase";
   }
@@ -1159,6 +1499,36 @@ function updateGhostGlobalMode() {
 function getCurrentGhostModeLabel() {
   if (isGhostFrightened()) return "FRIGHT";
   return ghostGlobalMode.toUpperCase();
+}
+
+function updateCruiseElroyState() {
+  const thresholds = getCruiseElroyThresholds(level, initialFoodCount);
+  const phaseLevel = getCruiseElroyPhase(remainingFoodCount, thresholds);
+  const phase1Scale =
+    currentLevelTuning && Number.isFinite(currentLevelTuning.blinkyElroyPhase1Multiplier)
+      ? currentLevelTuning.blinkyElroyPhase1Multiplier
+      : 1.05;
+  const phase2Scale =
+    currentLevelTuning && Number.isFinite(currentLevelTuning.blinkyElroyPhase2Multiplier)
+      ? currentLevelTuning.blinkyElroyPhase2Multiplier
+      : 1.12;
+
+  for (let i = 0; i < ghosts.length; i++) {
+    const ghost = ghosts[i];
+    if (!ghost || !Number.isFinite(ghost.baseCruiseSpeed)) continue;
+
+    let speedScale = 1;
+    if (
+      ghost.personality === "blinky" &&
+      !ghost.isEaten() &&
+      !ghost.isFrightened() &&
+      phaseLevel > 0
+    ) {
+      speedScale = phaseLevel >= 2 ? phase2Scale : phase1Scale;
+    }
+
+    ghost.setLevelSpeed(quantizeSpeed(ghost.baseCruiseSpeed * speedScale));
+  }
 }
 
 function resetFruitState() {
@@ -1221,7 +1591,13 @@ function tryConsumeFruit() {
   fruit.nextSpawnAt = lastUpdateNow + currentLevelTuning.fruitSpawnDelayMs;
 
   addScore(fruit.spec.points);
-  addPointPopup(fruit.x, fruit.y, `${fruit.spec.points}`, "#FFE16A", 1100);
+  addPointPopup(
+    fruit.x,
+    fruit.y,
+    `${fruit.spec.points}`,
+    getCurrentPalette().popupFruit,
+    1100
+  );
   playGameSfx("fruit");
 }
 
@@ -1264,7 +1640,13 @@ function eatCollidingGhosts(indices) {
         : 200 * Math.pow(2, ghostEatChain);
 
     addScore(points);
-    addPointPopup(ghost.getMapX(), ghost.getMapY(), `${points}`, "#78F7FF", 1200);
+    addPointPopup(
+      ghost.getMapX(),
+      ghost.getMapY(),
+      `${points}`,
+      getCurrentPalette().popupGhost,
+      1200
+    );
     ghostEatChain =
       utils && typeof utils.nextGhostEatChain === "function"
         ? utils.nextGhostEatChain(ghostEatChain, 6)
@@ -1321,6 +1703,7 @@ function createGhosts() {
       }
     );
 
+    ghost.baseCruiseSpeed = ghost.baseSpeed;
     ghosts.push(ghost);
   }
 }
@@ -1347,10 +1730,112 @@ function prepareRound() {
   resetFruitState();
 }
 
-function startNewGame() {
+function beginReplayCapture(seed) {
+  replayCurrentRun = {
+    seed,
+    challengeMode: settings.challengeMode,
+    events: [],
+    startedAt: Date.now(),
+  };
+}
+
+function recordReplayAction(action) {
+  if (!replayCurrentRun || isReplayRunning()) return;
+  replayCurrentRun.events.push({
+    frame: simulationFrame,
+    action,
+  });
+}
+
+function finalizeReplayCapture(metadata = {}) {
+  if (!replayCurrentRun) return;
+  replayLastRun = {
+    ...replayCurrentRun,
+    endedAt: Date.now(),
+    score,
+    level,
+    ...metadata,
+  };
+  replayCurrentRun = null;
+  renderReplayButton();
+}
+
+function startReplayLastRun() {
+  if (!replayLastRun || !Array.isArray(replayLastRun.events)) return;
+
+  replayPlayback = {
+    seed: replayLastRun.seed,
+    challengeMode: replayLastRun.challengeMode || CHALLENGE_MODES.CLASSIC,
+    events: replayLastRun.events.slice().sort((a, b) => a.frame - b.frame),
+    cursor: 0,
+  };
+  settings.challengeMode = replayPlayback.challengeMode;
+  persistSettings();
+  renderSettingsUi();
+  startNewGame({ replay: true, seed: replayPlayback.seed, skipCapture: true });
+  renderReplayButton();
+}
+
+function applyReplayEventsForFrame() {
+  if (!replayPlayback || !Array.isArray(replayPlayback.events)) return;
+
+  while (
+    replayPlayback.cursor < replayPlayback.events.length &&
+    replayPlayback.events[replayPlayback.cursor].frame <= simulationFrame
+  ) {
+    const entry = replayPlayback.events[replayPlayback.cursor];
+    replayPlayback.cursor += 1;
+    if (!entry || typeof entry.action !== "string") continue;
+    handleAction(entry.action, { source: "replay", record: false });
+  }
+}
+
+function maybeBeginAttractMode() {
+  if (phase !== GAME_PHASE_START || attractModeActive || attractTriggeredThisIdleWindow) return;
+  if (lastUpdateNow - lastUserIntentAt < ATTRACT_IDLE_MS) return;
+
+  attractTriggeredThisIdleWindow = true;
+  attractModeActive = true;
+  challengeModeBeforeAttract = settings.challengeMode;
+  settings.challengeMode = CHALLENGE_MODES.CLASSIC;
+  renderSettingsUi();
+  replayPlayback = {
+    seed: 20260211,
+    challengeMode: CHALLENGE_MODES.CLASSIC,
+    events: ATTRACT_DEMO_INPUTS.map((entry) => ({ ...entry })),
+    cursor: 0,
+  };
+  startNewGame({ replay: true, seed: replayPlayback.seed, skipCapture: true, attract: true });
+  trackAnalyticsEvent("attract_mode_started");
+}
+
+function startNewGame(options = {}) {
+  attractModeActive = Boolean(options.attract);
+  if (!attractModeActive) {
+    challengeModeBeforeAttract = null;
+  }
+  if (!options.replay) {
+    replayPlayback = null;
+  }
+
+  const replaySeed = options.seed;
+  const requestedSeed = Number.isFinite(replaySeed) ? replaySeed : createRunSeed();
+  activeRunSeed = requestedSeed;
+  setRunRandomSeed(activeRunSeed);
+
+  if (!options.skipCapture) {
+    finalizeReplayCapture({ reason: "new-game" });
+    beginReplayCapture(activeRunSeed);
+  }
+
+  challengeTimeRemainingMs = CHALLENGE_TIME_ATTACK_SECONDS * 1000;
+  simulationFrame = 0;
   disposeActors();
   score = 0;
-  lives = STARTING_LIVES;
+  lives =
+    settings.challengeMode === CHALLENGE_MODES.ONE_LIFE
+      ? 1
+      : STARTING_LIVES;
   level = START_LEVEL;
   nextBonusLifeScore = BONUS_LIFE_STEP;
   applyLevelTuning(level);
@@ -1359,17 +1844,26 @@ function startNewGame() {
   setPhase(GAME_PHASE_READY, {
     durationMs: ROUND_READY_MS,
     message: "READY!",
+    secondary:
+      settings.challengeMode === CHALLENGE_MODES.CLASSIC
+        ? ""
+        : `Mode: ${settings.challengeMode.replace("-", " ")}`,
   });
+  renderReplayButton();
 }
 
 function startNextLevel() {
   level += 1;
   applyLevelTuning(level);
+  if (settings.challengeMode === CHALLENGE_MODES.TIME_ATTACK) {
+    challengeTimeRemainingMs += 18000;
+  }
   resetMap();
   prepareRound();
   setPhase(GAME_PHASE_READY, {
     durationMs: ROUND_READY_MS,
     message: "READY!",
+    secondary: settings.challengeMode === CHALLENGE_MODES.TIME_ATTACK ? "Time bonus +18s" : "",
   });
 }
 
@@ -1379,16 +1873,45 @@ function restartCurrentRun() {
 }
 
 function onLevelComplete() {
-  syncHighScore();
+  if (!attractModeActive) {
+    syncHighScore();
+  }
   playGameSfx("levelClear");
   setPhase(GAME_PHASE_INTERMISSION, {
     durationMs: INTERMISSION_MS,
     message: "STAGE CLEAR!",
+    secondary: "Preparing next scene...",
   });
 }
 
+function startCutscene(levelNumber) {
+  const spec = CUTSCENES_BY_LEVEL[levelNumber];
+  if (!spec) {
+    activeCutscene = null;
+    startNextLevel();
+    return;
+  }
+
+  activeCutscene = {
+    ...spec,
+    startedAt: lastUpdateNow,
+  };
+  setPhase(GAME_PHASE_CUTSCENE, {
+    durationMs: spec.durationMs,
+    message: spec.title,
+    secondary: "Press Start to skip",
+  });
+}
+
+function skipCutscene() {
+  if (phase !== GAME_PHASE_CUTSCENE) return;
+  activeCutscene = null;
+  phaseUntil = 0;
+  startNextLevel();
+}
+
 function onGhostCollision() {
-  lives -= 1;
+  lives = Math.max(0, lives - 1);
   clearFrightenedMode();
   fruit.active = false;
   playGameSfx("death");
@@ -1468,7 +1991,24 @@ function bindKey(action, rawKey) {
   renderSettingsUi();
 }
 
-function handleAction(action) {
+function handleAction(action, options = {}) {
+  const source = options.source || "user";
+  const shouldRecord = options.record !== false && source !== "replay";
+  const isUserAction = source !== "replay";
+
+  if (isUserAction) {
+    noteUserIntent();
+  }
+
+  if (shouldRecord) {
+    recordReplayAction(action);
+  }
+
+  if (phase === GAME_PHASE_CUTSCENE && action === "start") {
+    skipCutscene();
+    return;
+  }
+
   if (action === "left") {
     setPacmanDirection(DIRECTION_LEFT);
     return;
@@ -1502,6 +2042,8 @@ function handleAction(action) {
       startNewGame();
     } else if (phase === GAME_PHASE_PAUSED) {
       setPaused(false);
+    } else if (phase === GAME_PHASE_CUTSCENE) {
+      skipCutscene();
     }
   }
 }
@@ -1544,9 +2086,9 @@ function onCanvasTouchEnd(event) {
   }
 
   if (Math.abs(dx) > Math.abs(dy)) {
-    setPacmanDirection(dx > 0 ? DIRECTION_RIGHT : DIRECTION_LEFT);
+    handleAction(dx > 0 ? "right" : "left", { source: "touch" });
   } else {
-    setPacmanDirection(dy > 0 ? DIRECTION_BOTTOM : DIRECTION_UP);
+    handleAction(dy > 0 ? "down" : "up", { source: "touch" });
   }
 }
 
@@ -1575,9 +2117,9 @@ function updateDirectionFromVector(dx, dy) {
   }
 
   if (Math.abs(dx) > Math.abs(dy)) {
-    setPacmanDirection(dx > 0 ? DIRECTION_RIGHT : DIRECTION_LEFT);
+    handleAction(dx > 0 ? "right" : "left", { source: "touch" });
   } else {
-    setPacmanDirection(dy > 0 ? DIRECTION_BOTTOM : DIRECTION_UP);
+    handleAction(dy > 0 ? "down" : "up", { source: "touch" });
   }
 }
 
@@ -1625,6 +2167,7 @@ function onStickPointerUp(event) {
 }
 
 function pollGamepadInput() {
+  if (isReplayRunning()) return;
   if (typeof navigator.getGamepads !== "function") return;
   const pads = navigator.getGamepads();
   const gamepad = pads && pads[0] ? pads[0] : null;
@@ -1671,11 +2214,11 @@ function pollGamepadInput() {
 
   if (left || right || up || down) {
     if (Math.abs(axisX) > Math.abs(axisY)) {
-      if (left) setPacmanDirection(DIRECTION_LEFT);
-      if (right) setPacmanDirection(DIRECTION_RIGHT);
+      if (left) handleAction("left", { source: "gamepad" });
+      if (right) handleAction("right", { source: "gamepad" });
     } else {
-      if (up) setPacmanDirection(DIRECTION_UP);
-      if (down) setPacmanDirection(DIRECTION_BOTTOM);
+      if (up) handleAction("up", { source: "gamepad" });
+      if (down) handleAction("down", { source: "gamepad" });
     }
   }
 }
@@ -1683,9 +2226,40 @@ function pollGamepadInput() {
 function registerPwaHandlers() {
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./service-worker.js").catch(() => {
-        // Service worker registration can fail in unsupported/private contexts.
-      });
+      navigator.serviceWorker
+        .register("./service-worker.js")
+        .then((registration) => {
+          swRegistration = registration;
+
+          function markUpdateReady() {
+            if (!registration.waiting) return;
+            swUpdateReady = true;
+            renderUpdateButton();
+            addHudToast("Update ready", getCurrentPalette().textMode, 1600);
+            trackAnalyticsEvent("sw_update_ready");
+          }
+
+          markUpdateReady();
+          registration.addEventListener("updatefound", () => {
+            const installing = registration.installing;
+            if (!installing) return;
+            installing.addEventListener("statechange", () => {
+              if (installing.state === "installed" && navigator.serviceWorker.controller) {
+                markUpdateReady();
+              }
+            });
+          });
+        })
+        .catch(() => {
+          // Service worker registration can fail in unsupported/private contexts.
+        });
+    });
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!swUpdateReady) return;
+      swUpdateReady = false;
+      renderUpdateButton();
+      window.location.reload();
     });
   }
 
@@ -1693,22 +2267,31 @@ function registerPwaHandlers() {
     event.preventDefault();
     deferredInstallPrompt = event;
     renderInstallButton();
+    trackAnalyticsEvent("install_prompt_ready");
   });
 
   window.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
     renderInstallButton();
-    addHudToast("App installed", "#78F7FF", 1500);
+    addHudToast("App installed", getCurrentPalette().toastBonus, 1500);
+    trackAnalyticsEvent("app_installed");
   });
 }
 
 function handleInstallApp() {
   if (!deferredInstallPrompt) return;
+  trackAnalyticsEvent("install_prompt_opened");
   deferredInstallPrompt.prompt();
-  deferredInstallPrompt.userChoice.finally(() => {
-    deferredInstallPrompt = null;
-    renderInstallButton();
-  });
+  deferredInstallPrompt.userChoice
+    .then((choice) => {
+      trackAnalyticsEvent("install_prompt_result", {
+        outcome: choice && choice.outcome ? choice.outcome : "unknown",
+      });
+    })
+    .finally(() => {
+      deferredInstallPrompt = null;
+      renderInstallButton();
+    });
 }
 
 function updatePhaseTransitions() {
@@ -1722,7 +2305,27 @@ function updatePhaseTransitions() {
 
   if (phase === GAME_PHASE_DYING) {
     if (lives <= 0) {
-      syncHighScore();
+      if (attractModeActive) {
+        attractModeActive = false;
+        attractTriggeredThisIdleWindow = false;
+        lastUserIntentAt = lastUpdateNow;
+        if (challengeModeBeforeAttract) {
+          settings.challengeMode = challengeModeBeforeAttract;
+          challengeModeBeforeAttract = null;
+          renderSettingsUi();
+        }
+        replayPlayback = null;
+        renderReplayButton();
+        prepareRound();
+        setPhase(GAME_PHASE_START, { message: "Press Start", secondary: "Demo ended" });
+        return;
+      }
+      if (!attractModeActive) {
+        syncHighScore();
+      }
+      finalizeReplayCapture({ reason: "game-over" });
+      replayPlayback = null;
+      renderReplayButton();
       setPhase(GAME_PHASE_GAMEOVER, {
         message: "Press Start or your start key",
       });
@@ -1738,6 +2341,16 @@ function updatePhaseTransitions() {
   }
 
   if (phase === GAME_PHASE_INTERMISSION) {
+    if (Object.prototype.hasOwnProperty.call(CUTSCENES_BY_LEVEL, level)) {
+      startCutscene(level);
+    } else {
+      startNextLevel();
+    }
+    return;
+  }
+
+  if (phase === GAME_PHASE_CUTSCENE) {
+    activeCutscene = null;
     startNextLevel();
   }
 }
@@ -1759,7 +2372,12 @@ function updateGameplay() {
   }
 
   if (eatResult && eatResult.atePowerPellet) {
-    activateFrightenedMode(currentLevelTuning.frightenedDurationMs);
+    if (settings.challengeMode !== CHALLENGE_MODES.NO_POWER) {
+      activateFrightenedMode(currentLevelTuning.frightenedDurationMs);
+    } else {
+      playGameSfx("pellet");
+      addHudToast("No power in this mode", getCurrentPalette().textMode, 900);
+    }
   }
 
   if (!isGhostFrightened() && ghostEatChain !== 0) {
@@ -1767,6 +2385,7 @@ function updateGameplay() {
   }
 
   updateGhostGlobalMode();
+  updateCruiseElroyState();
   updateFruitState();
   tryConsumeFruit();
   updateGhosts();
@@ -1787,9 +2406,21 @@ function updateGameplay() {
 }
 
 function update() {
+  simulationFrame += 1;
+  maybeBeginAttractMode();
+  applyReplayEventsForFrame();
   pollGamepadInput();
   updatePhaseTransitions();
   updatePopups();
+
+  if (phase === GAME_PHASE_PLAYING && settings.challengeMode === CHALLENGE_MODES.TIME_ATTACK) {
+    challengeTimeRemainingMs = Math.max(0, challengeTimeRemainingMs - FRAME_STEP_MS);
+    if (challengeTimeRemainingMs <= 0) {
+      lives = 0;
+      onGhostCollision();
+      return;
+    }
+  }
 
   if (phase === GAME_PHASE_PLAYING) {
     updateGameplay();
@@ -1797,6 +2428,7 @@ function update() {
 }
 
 function drawWalls() {
+  const palette = getCurrentPalette();
   for (let i = 0; i < wallTiles.length; i++) {
     const tile = wallTiles[i];
     const x = tile.x;
@@ -1807,12 +2439,12 @@ function drawWalls() {
       y * oneBlockSize,
       oneBlockSize,
       oneBlockSize,
-      "#342DCA"
+      palette.wallOuter
     );
 
     const wallSpaceWidth = oneBlockSize / 1.6;
     const wallOffset = (oneBlockSize - wallSpaceWidth) / 2;
-    const wallInnerColor = "black";
+    const wallInnerColor = palette.wallInner;
 
     if (x > 0 && map[y][x - 1] === 1) {
       createRect(
@@ -1857,6 +2489,7 @@ function drawWalls() {
 }
 
 function drawFoods() {
+  const palette = getCurrentPalette();
   for (let y = 0; y < map.length; y++) {
     for (let x = 0; x < map[0].length; x++) {
       if (map[y][x] !== 2 && map[y][x] !== 4) continue;
@@ -1870,7 +2503,7 @@ function drawFoods() {
         y * oneBlockSize + offset,
         size,
         size,
-        isPowerPellet ? "#F7FF8A" : "#FEB897"
+        isPowerPellet ? palette.powerPellet : palette.pellet
       );
     }
   }
@@ -1924,8 +2557,10 @@ function drawPacman() {
 }
 
 function drawRemainingLives() {
-  canvasContext.font = "20px Emulogic";
-  canvasContext.fillStyle = "white";
+  const palette = getCurrentPalette();
+  const hudScale = settings.largeHud ? 1.18 : 1;
+  canvasContext.font = `${Math.round(20 * hudScale)}px Emulogic`;
+  canvasContext.fillStyle = palette.textPrimary;
   canvasContext.fillText("Lives:", logicalW - 190, oneBlockSize * (map.length + 1));
 
   for (let i = 0; i < lives; i++) {
@@ -1944,31 +2579,52 @@ function drawRemainingLives() {
 }
 
 function drawScoreHud() {
+  const palette = getCurrentPalette();
+  const hudScale = settings.largeHud ? 1.18 : 1;
   const hudY = oneBlockSize * (map.length + 1);
   const hudY2 = oneBlockSize * (map.length + 1.8);
 
-  canvasContext.font = "20px Emulogic";
-  canvasContext.fillStyle = "white";
+  canvasContext.font = `${Math.round(20 * hudScale)}px Emulogic`;
+  canvasContext.fillStyle = palette.textPrimary;
   canvasContext.fillText(`Score: ${score}`, 0, hudY);
 
-  canvasContext.font = "16px Emulogic";
-  canvasContext.fillStyle = "#FFE16A";
+  canvasContext.font = `${Math.round(16 * hudScale)}px Emulogic`;
+  canvasContext.fillStyle = palette.textHigh;
   canvasContext.fillText(`High: ${highScore}`, 0, hudY2);
 
-  canvasContext.fillStyle = "#B8D8FF";
+  canvasContext.fillStyle = palette.textAccent;
   canvasContext.fillText(`Level: ${level}`, 220, hudY);
 
-  canvasContext.fillStyle = "#78F7FF";
+  canvasContext.fillStyle = palette.textMode;
   canvasContext.fillText(`Mode: ${getCurrentGhostModeLabel()}`, 220, hudY2);
 
-  canvasContext.fillStyle = "#FFC95A";
+  canvasContext.fillStyle = palette.textFruit;
   canvasContext.fillText(`Fruit: ${fruit.spec.name}`, 390, hudY2);
 
   if (isGhostFrightened()) {
     const remainingMs = Math.max(0, frightenedUntil - lastUpdateNow);
     const seconds = Math.ceil(remainingMs / 1000);
-    canvasContext.fillStyle = "#78F7FF";
+    canvasContext.fillStyle = palette.textMode;
     canvasContext.fillText(`Fright: ${seconds}s`, 390, hudY);
+  }
+
+  if (settings.challengeMode === CHALLENGE_MODES.TIME_ATTACK) {
+    const timeLeft = Math.max(0, Math.ceil(challengeTimeRemainingMs / 1000));
+    canvasContext.fillStyle = palette.textHigh;
+    canvasContext.fillText(`Time: ${timeLeft}s`, 560, hudY);
+  } else if (settings.challengeMode !== CHALLENGE_MODES.CLASSIC) {
+    canvasContext.fillStyle = palette.textHigh;
+    canvasContext.fillText(`Challenge: ${settings.challengeMode}`, 560, hudY);
+  }
+
+  if (attractModeActive) {
+    canvasContext.fillStyle = palette.textMode;
+    canvasContext.fillText("DEMO", 560, hudY2);
+  }
+
+  if (isReplayRunning()) {
+    canvasContext.fillStyle = palette.textMode;
+    canvasContext.fillText("REPLAY", 690, hudY2);
   }
 }
 
@@ -1976,7 +2632,7 @@ function drawPointPopups() {
   for (let i = 0; i < pointPopups.length; i++) {
     const popup = pointPopups[i];
     const life = (popup.expiresAt - lastUpdateNow) / (popup.expiresAt - popup.createdAt);
-    const yOffset = (1 - life) * oneBlockSize;
+    const yOffset = settings.reducedMotion ? 0 : (1 - life) * oneBlockSize;
 
     canvasContext.font = "14px Emulogic";
     canvasContext.fillStyle = popup.color;
@@ -1999,17 +2655,18 @@ function drawHudToasts() {
 }
 
 function drawOverlay(title, subtitle) {
+  const palette = getCurrentPalette();
   canvasContext.fillStyle = "rgba(0, 0, 0, 0.58)";
   canvasContext.fillRect(0, 0, logicalW, logicalH);
 
   canvasContext.textAlign = "center";
   canvasContext.font = "24px Emulogic";
-  canvasContext.fillStyle = "#FFDE00";
+  canvasContext.fillStyle = palette.overlayTitle;
   canvasContext.fillText(title, logicalW / 2, logicalH / 2 - 12);
 
   if (subtitle) {
     canvasContext.font = "12px Emulogic";
-    canvasContext.fillStyle = "#DDE7FF";
+    canvasContext.fillStyle = palette.overlaySubtitle;
     canvasContext.fillText(subtitle, logicalW / 2, logicalH / 2 + oneBlockSize);
   }
 
@@ -2017,21 +2674,73 @@ function drawOverlay(title, subtitle) {
 }
 
 function drawReadyMessage() {
+  const palette = getCurrentPalette();
   canvasContext.textAlign = "center";
   canvasContext.font = "22px Emulogic";
-  canvasContext.fillStyle = "#FFDE00";
+  canvasContext.fillStyle = palette.overlayTitle;
   canvasContext.fillText("READY!", logicalW / 2, logicalH / 2);
   canvasContext.textAlign = "start";
 }
 
+function drawCutscene() {
+  if (!activeCutscene) return;
+
+  const elapsed = Math.max(0, lastUpdateNow - activeCutscene.startedAt);
+  const progress = Math.min(1, elapsed / Math.max(1, activeCutscene.durationMs));
+  const tone = activeCutscene.tone || "amber";
+  const palette = getCurrentPalette();
+
+  let accent = "#FFB46E";
+  if (tone === "cyan") accent = "#7CF7D4";
+  if (tone === "rose") accent = "#FF8CA8";
+
+  canvasContext.save();
+  canvasContext.fillStyle = "rgba(0, 0, 0, 0.7)";
+  canvasContext.fillRect(0, 0, logicalW, logicalH);
+
+  canvasContext.textAlign = "center";
+  canvasContext.fillStyle = accent;
+  canvasContext.font = "24px Emulogic";
+  canvasContext.fillText(activeCutscene.title, logicalW / 2, logicalH * 0.36);
+
+  canvasContext.fillStyle = palette.overlaySubtitle;
+  canvasContext.font = "12px Emulogic";
+  canvasContext.fillText(activeCutscene.subtitle, logicalW / 2, logicalH * 0.44);
+  canvasContext.fillText("Press Start to skip", logicalW / 2, logicalH * 0.52);
+
+  const laneY = logicalH * 0.68;
+  const pacX = oneBlockSize + progress * (logicalW - oneBlockSize * 4);
+  const ghostX = logicalW - oneBlockSize * 2 - progress * (logicalW - oneBlockSize * 4);
+  const oscillate = settings.reducedMotion ? 0 : Math.sin(elapsed / 160) * 5;
+
+  canvasContext.fillStyle = "#FDE047";
+  canvasContext.beginPath();
+  canvasContext.arc(pacX, laneY + oscillate, oneBlockSize * 0.45, 0, 2 * Math.PI);
+  canvasContext.fill();
+
+  canvasContext.fillStyle = accent;
+  canvasContext.beginPath();
+  canvasContext.arc(ghostX, laneY - oscillate, oneBlockSize * 0.43, 0, 2 * Math.PI);
+  canvasContext.fill();
+  canvasContext.restore();
+}
+
 function drawPhaseOverlay() {
+  if (phase === GAME_PHASE_CUTSCENE) {
+    drawCutscene();
+    return;
+  }
+
   if (phase === GAME_PHASE_PAUSED) {
     drawOverlay("PAUSED", "Press pause key or button to continue");
     return;
   }
 
   if (phase === GAME_PHASE_START) {
-    drawOverlay("PAC-MAN", "Press Start, Enter, or gamepad Start");
+    const subtitle = attractModeActive
+      ? "Demo running - press Start to play"
+      : "Press Start, Enter, or gamepad Start";
+    drawOverlay("PAC-MAN", subtitle);
     return;
   }
 
@@ -2056,8 +2765,9 @@ function drawPhaseOverlay() {
 }
 
 function draw() {
+  const palette = getCurrentPalette();
   canvasContext.clearRect(0, 0, logicalW, logicalH);
-  createRect(0, 0, logicalW, logicalH, "black");
+  createRect(0, 0, logicalW, logicalH, palette.background);
 
   drawWalls();
   drawFoods();
@@ -2093,9 +2803,8 @@ function wireUiEvents() {
       event.preventDefault();
       primeAudioContext();
       const directionName = event.currentTarget.dataset.direction;
-      const nextDirection = mapDirectionNameToCode(directionName);
-      if (nextDirection === null) return;
-      setPacmanDirection(nextDirection);
+      if (!directionName) return;
+      handleAction(directionName, { source: "touch" });
     });
   }
 
@@ -2127,6 +2836,14 @@ function wireUiEvents() {
     });
   }
 
+  if (replayLastButton) {
+    replayLastButton.addEventListener("click", () => {
+      primeAudioContext();
+      noteUserIntent();
+      startReplayLastRun();
+    });
+  }
+
   if (muteToggleButton) {
     muteToggleButton.addEventListener("click", () => {
       primeAudioContext();
@@ -2137,7 +2854,16 @@ function wireUiEvents() {
   if (installAppButton) {
     installAppButton.addEventListener("click", () => {
       primeAudioContext();
+      noteUserIntent();
       handleInstallApp();
+    });
+  }
+
+  if (updateAppButton) {
+    updateAppButton.addEventListener("click", () => {
+      if (!swRegistration || !swRegistration.waiting) return;
+      swRegistration.waiting.postMessage({ type: "SKIP_WAITING" });
+      trackAnalyticsEvent("sw_update_clicked");
     });
   }
 
@@ -2165,6 +2891,45 @@ function wireUiEvents() {
     });
   }
 
+  if (challengeModeSelect) {
+    challengeModeSelect.addEventListener("change", (event) => {
+      const nextMode = event.target.value;
+      settings.challengeMode = Object.values(CHALLENGE_MODES).includes(nextMode)
+        ? nextMode
+        : CHALLENGE_MODES.CLASSIC;
+      persistSettings();
+      renderSettingsUi();
+      addHudToast(`Mode: ${settings.challengeMode}`, getCurrentPalette().textMode, 1100);
+    });
+  }
+
+  if (paletteModeSelect) {
+    paletteModeSelect.addEventListener("change", (event) => {
+      const nextPalette = event.target.value;
+      settings.paletteMode = Object.prototype.hasOwnProperty.call(COLOR_PALETTES, nextPalette)
+        ? nextPalette
+        : "classic";
+      persistSettings();
+      renderSettingsUi();
+    });
+  }
+
+  if (reducedMotionToggle) {
+    reducedMotionToggle.addEventListener("change", (event) => {
+      settings.reducedMotion = Boolean(event.target.checked);
+      persistSettings();
+      applyAccessibilitySettings();
+    });
+  }
+
+  if (largeHudToggle) {
+    largeHudToggle.addEventListener("change", (event) => {
+      settings.largeHud = Boolean(event.target.checked);
+      persistSettings();
+      applyAccessibilitySettings();
+    });
+  }
+
   if (settingsPanel) {
     settingsPanel.addEventListener("toggle", () => {
       resizeCanvasToFitViewport();
@@ -2186,6 +2951,9 @@ function wireUiEvents() {
   window.addEventListener("keydown", (event) => {
     const normalizedKey = normalizeKeyName(event.key);
     primeAudioContext();
+    if (!pendingRebindAction) {
+      noteUserIntent();
+    }
 
     if (pendingRebindAction) {
       event.preventDefault();
@@ -2215,6 +2983,10 @@ function wireUiEvents() {
     resizeCanvasToFitViewport();
   });
 
+  window.addEventListener("pointerdown", () => {
+    noteUserIntent();
+  }, { passive: true });
+
   window.addEventListener("beforeunload", () => {
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
@@ -2225,6 +2997,8 @@ function wireUiEvents() {
 }
 
 function boot() {
+  activeRunSeed = createRunSeed();
+  setRunRandomSeed(activeRunSeed);
   highScore = readHighScoreFromStorage();
   syncHighScore();
 
@@ -2241,6 +3015,8 @@ function boot() {
   renderPauseButton();
   renderMuteButton();
   renderInstallButton();
+  renderUpdateButton();
+  renderReplayButton();
   renderArcadeViewButton();
   renderSettingsUi();
   applyAudioSettings();

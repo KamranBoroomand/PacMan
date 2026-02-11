@@ -35,24 +35,65 @@ jobs:
       - name: Validate with lint and unit tests
         run: npm run check
 
+      - name: Validate semantic version
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid semantic version: $VERSION"
+            exit 1
+          fi
+
       - name: Generate changelog
         id: changelog
         run: |
           TAG="v${{ inputs.version }}"
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          RANGE="HEAD"
+          if [ -n "$LAST_TAG" ]; then
+            RANGE="${LAST_TAG}..HEAD"
+          fi
+
+          COMMITS=$(git log --pretty=format:'%s|%h' "$RANGE")
+          FEAT=""
+          FIX=""
+          DOCS=""
+          CHORE=""
+
+          while IFS='|' read -r SUBJECT SHA; do
+            if [ -z "$SUBJECT" ]; then
+              continue
+            fi
+            if [[ "$SUBJECT" == feat:* ]]; then
+              FEAT+="- ${SUBJECT#feat: } (${SHA})"$'\n'
+            elif [[ "$SUBJECT" == fix:* ]]; then
+              FIX+="- ${SUBJECT#fix: } (${SHA})"$'\n'
+            elif [[ "$SUBJECT" == docs:* ]]; then
+              DOCS+="- ${SUBJECT#docs: } (${SHA})"$'\n'
+            else
+              CHORE+="- ${SUBJECT} (${SHA})"$'\n'
+            fi
+          done <<< "$COMMITS"
 
           {
             echo "# PacMan ${TAG}"
             echo
             if [ -n "$LAST_TAG" ]; then
-              echo "Changes since ${LAST_TAG}:"
-              echo
-              git log --pretty=format:'- %s (%h)' "${LAST_TAG}"..HEAD
+              echo "Changes since ${LAST_TAG}"
             else
-              echo "Initial release changes:"
-              echo
-              git log --pretty=format:'- %s (%h)' HEAD
+              echo "Initial release"
             fi
+            echo
+            echo "## Features"
+            echo "${FEAT:-_No feature commits._}"
+            echo
+            echo "## Fixes"
+            echo "${FIX:-_No fix commits._}"
+            echo
+            echo "## Docs"
+            echo "${DOCS:-_No docs commits._}"
+            echo
+            echo "## Chore & Other"
+            echo "${CHORE:-_No additional commits._}"
           } > RELEASE_NOTES.md
 
       - name: Create and push git tag

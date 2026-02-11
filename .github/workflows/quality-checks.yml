@@ -3,6 +3,12 @@ name: Quality Checks
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      run_visual:
+        description: "Run visual Playwright snapshots"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   quality:
@@ -29,6 +35,10 @@ jobs:
 
       - name: E2E tests
         run: npm run test:e2e
+
+      - name: Visual snapshot tests
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_visual }}
+        run: PLAYWRIGHT_VISUAL=1 npm run test:e2e
 
   site-artifact:
     name: Build Site Artifact

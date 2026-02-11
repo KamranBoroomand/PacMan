@@ -51,9 +51,11 @@
       <button id="start-game" class="action-btn" type="button">Start</button>
       <button id="pause-toggle" class="action-btn" type="button" aria-pressed="false">Pause</button>
       <button id="restart-game" class="action-btn" type="button">Restart</button>
+      <button id="replay-last" class="action-btn" type="button" disabled>Replay</button>
       <button id="mute-toggle" class="action-btn" type="button" aria-pressed="false">Sound: On</button>
       <button id="arcade-view-toggle" class="action-btn desktop-only" type="button" aria-pressed="false">Arcade View</button>
       <button id="install-app" class="action-btn hidden" type="button">Install App</button>
+      <button id="update-app" class="action-btn hidden" type="button">Update Ready</button>
     </div>
   </header>
 
@@ -95,6 +97,35 @@
             <option value="buttons">Buttons</option>
             <option value="stick">Virtual Stick</option>
           </select>
+        </label>
+
+        <label class="settings-item" for="challenge-mode">
+          <span>Challenge Mode</span>
+          <select id="challenge-mode">
+            <option value="classic">Classic</option>
+            <option value="time-attack">Time Attack</option>
+            <option value="no-power">No Power Pellets</option>
+            <option value="one-life">One Life</option>
+          </select>
+        </label>
+
+        <label class="settings-item" for="palette-mode">
+          <span>Color Palette</span>
+          <select id="palette-mode">
+            <option value="classic">Classic</option>
+            <option value="colorblind">Colorblind Friendly</option>
+            <option value="high-contrast">High Contrast</option>
+          </select>
+        </label>
+
+        <label class="settings-item settings-toggle" for="reduced-motion">
+          <span>Reduced Motion</span>
+          <input id="reduced-motion" type="checkbox" />
+        </label>
+
+        <label class="settings-item settings-toggle" for="large-hud">
+          <span>Large HUD Text</span>
+          <input id="large-hud" type="checkbox" />
         </label>
 
         <div class="settings-item keybinds" aria-label="Key bindings">

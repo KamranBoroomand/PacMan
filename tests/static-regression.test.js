@@ -15,9 +15,13 @@ test("index.html exposes upgraded controls and settings", () => {
   assert.match(indexHtml, /id="start-game"/);
   assert.match(indexHtml, /id="pause-toggle"/);
   assert.match(indexHtml, /id="restart-game"/);
+  assert.match(indexHtml, /id="replay-last"/);
   assert.match(indexHtml, /id="mute-toggle"/);
   assert.match(indexHtml, /id="install-app"/);
+  assert.match(indexHtml, /id="update-app"/);
   assert.match(indexHtml, /id="mobile-input-mode"/);
+  assert.match(indexHtml, /id="challenge-mode"/);
+  assert.match(indexHtml, /id="palette-mode"/);
   assert.match(indexHtml, /class="keybind-btn"/);
   assert.match(indexHtml, /id="virtual-stick"/);
   assert.match(indexHtml, /manifest\.webmanifest/);
@@ -28,13 +32,18 @@ test("game.js keeps arcade AI, level progression, and phase states", () => {
 
   assert.match(gameJs, /GHOST_DEFINITIONS/);
   assert.match(gameJs, /GHOST_MODE_SCHEDULE/);
+  assert.match(gameJs, /GHOST_MODE_SCHEDULE_BY_LEVEL/);
+  assert.match(gameJs, /updateCruiseElroyState/);
   assert.match(gameJs, /getGhostTargetForPersonality/);
   assert.match(gameJs, /function startNextLevel/);
   assert.match(gameJs, /function setPhase/);
   assert.match(gameJs, /GAME_PHASE_READY/);
   assert.match(gameJs, /GAME_PHASE_INTERMISSION/);
+  assert.match(gameJs, /GAME_PHASE_CUTSCENE/);
   assert.match(gameJs, /FRUIT_TABLE/);
   assert.match(gameJs, /BONUS_LIFE_STEP/);
+  assert.match(gameJs, /attractModeActive/);
+  assert.match(gameJs, /startReplayLastRun/);
   assert.match(gameJs, /requestAnimationFrame\(gameLoop\)/);
 });
 
@@ -66,9 +75,11 @@ test("pwa files exist and include offline cache", () => {
 
   assert.match(manifest, /"name"\s*:\s*"PacMan"/);
   assert.match(manifest, /"display"\s*:\s*"standalone"/);
-  assert.match(sw, /CACHE_NAME/);
+  assert.match(sw, /CACHE_VERSION/);
+  assert.match(sw, /STATIC_CACHE_NAME/);
   assert.match(sw, /addEventListener\("install"/);
   assert.match(sw, /addEventListener\("fetch"/);
+  assert.match(sw, /SKIP_WAITING/);
 });
 
 test("release and quality workflows are present", () => {
@@ -78,6 +89,8 @@ test("release and quality workflows are present", () => {
   assert.match(qualityWorkflow, /Quality Checks/);
   assert.match(qualityWorkflow, /test:e2e/);
   assert.match(releaseWorkflow, /workflow_dispatch/);
+  assert.match(releaseWorkflow, /Validate semantic version/);
   assert.match(releaseWorkflow, /Generate changelog/);
+  assert.match(releaseWorkflow, /## Features/);
   assert.match(releaseWorkflow, /action-gh-release/);
 });

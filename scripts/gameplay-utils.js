@@ -14,6 +14,37 @@
     { mode: "scatter", durationMs: 5000 },
     { mode: "chase", durationMs: Infinity },
   ];
+  const DEFAULT_GHOST_MODE_SCHEDULE_BY_LEVEL = [
+    DEFAULT_GHOST_MODE_SCHEDULE,
+    DEFAULT_GHOST_MODE_SCHEDULE,
+    DEFAULT_GHOST_MODE_SCHEDULE,
+    [
+      { mode: "scatter", durationMs: 5000 },
+      { mode: "chase", durationMs: 20000 },
+      { mode: "scatter", durationMs: 5000 },
+      { mode: "chase", durationMs: 20000 },
+      { mode: "scatter", durationMs: 5000 },
+      { mode: "chase", durationMs: 20000 },
+      { mode: "scatter", durationMs: 5000 },
+      { mode: "chase", durationMs: Infinity },
+    ],
+    [
+      { mode: "scatter", durationMs: 5000 },
+      { mode: "chase", durationMs: 20000 },
+      { mode: "scatter", durationMs: 5000 },
+      { mode: "chase", durationMs: 20000 },
+      { mode: "scatter", durationMs: 5000 },
+      { mode: "chase", durationMs: Infinity },
+    ],
+    [
+      { mode: "scatter", durationMs: 5000 },
+      { mode: "chase", durationMs: 20000 },
+      { mode: "scatter", durationMs: 5000 },
+      { mode: "chase", durationMs: 1033000 },
+      { mode: "scatter", durationMs: 17 },
+      { mode: "chase", durationMs: Infinity },
+    ],
+  ];
   const LEVEL_TUNING_CAP = 14;
 
   function toSafeInteger(value, fallback = 0) {
@@ -168,6 +199,34 @@
     }
 
     return "chase";
+  }
+
+  function getGhostModeScheduleForLevel(level, schedules = DEFAULT_GHOST_MODE_SCHEDULE_BY_LEVEL) {
+    const safeLevel = Math.max(1, toSafeInteger(level, 1));
+    const index = Math.min(schedules.length - 1, safeLevel - 1);
+    return schedules[index];
+  }
+
+  function computeCruiseElroyPhase(remainingDots, phase1Threshold, phase2Threshold) {
+    const safeRemaining = Math.max(0, toSafeInteger(remainingDots, 0));
+    const safePhase1 = Math.max(0, toSafeInteger(phase1Threshold, 0));
+    const safePhase2 = Math.max(0, toSafeInteger(phase2Threshold, 0));
+
+    if (safeRemaining <= safePhase2) return 2;
+    if (safeRemaining <= safePhase1) return 1;
+    return 0;
+  }
+
+  function createSeededRandom(seed) {
+    let state = Math.abs(toSafeInteger(seed, 123456789)) % 2147483647;
+    if (state === 0) {
+      state = 123456789;
+    }
+
+    return function nextRandom() {
+      state = (state * 48271) % 2147483647;
+      return (state - 1) / 2147483646;
+    };
   }
 
   function getGhostDirectionPriority(direction, personality = "blinky") {
@@ -395,6 +454,9 @@
       frightenedDurationMs: Math.max(2200, 6800 - (safeLevel - 1) * 420),
       fruitSpawnDelayMs: Math.max(5000, 12000 - (safeLevel - 1) * 350),
       fruitVisibleMs: Math.max(4200, 10000 - (safeLevel - 1) * 220),
+      frightenedTurnLimit: Math.max(1, 7 - Math.floor((safeLevel - 1) / 2)),
+      blinkyElroyPhase1Multiplier: 1.03 + Math.min(0.05, (safeLevel - 1) * 0.005),
+      blinkyElroyPhase2Multiplier: 1.08 + Math.min(0.09, (safeLevel - 1) * 0.006),
     };
   }
 
@@ -476,10 +538,13 @@
     checkRectTileCollision,
     computeBlinkyTargetTile,
     computeClydeTargetTile,
+    computeCruiseElroyPhase,
     computeGhostEatScore,
     computeInkyTargetTile,
     computePinkyTargetTile,
     computeScatterChaseMode,
+    createSeededRandom,
+    getGhostModeScheduleForLevel,
     getGhostDirectionPriority,
     getLevelTuning,
     isFrightenedFlashing,

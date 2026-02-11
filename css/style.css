@@ -292,6 +292,14 @@ body {
   color: var(--accent);
 }
 
+.action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  color: var(--muted);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 .action-btn[aria-pressed="true"] {
   border-color: var(--line-strong);
   color: var(--accent);
@@ -452,6 +460,17 @@ body {
   width: 100%;
 }
 
+.settings-toggle {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-toggle input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+}
+
 .keybinds {
   grid-column: 1 / -1;
 }
@@ -554,6 +573,12 @@ body.arcade-view .game-actions {
   padding: 8px;
   background: rgba(7, 15, 25, 0.9);
   backdrop-filter: blur(8px);
+}
+
+body.reduced-motion,
+body.reduced-motion * {
+  animation: none !important;
+  transition: none !important;
 }
 
 @keyframes enter-down {
