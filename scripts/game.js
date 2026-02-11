@@ -293,12 +293,14 @@ const horizontalTunnelRows = [8, 15, 27];
 for (let i = 0; i < horizontalTunnelRows.length; i++) {
   const row = horizontalTunnelRows[i];
   const lastColumn = classicMap[row].length - 1;
+  const tunnelDepth = 4;
   classicMap[row][0] = 0;
-  classicMap[row][1] = 2;
-  classicMap[row][2] = 2;
-  classicMap[row][lastColumn - 2] = 2;
-  classicMap[row][lastColumn - 1] = 2;
   classicMap[row][lastColumn] = 0;
+
+  for (let x = 1; x <= tunnelDepth; x++) {
+    classicMap[row][x] = 2;
+    classicMap[row][lastColumn - x] = 2;
+  }
 }
 
 for (let y = 18; y <= 26; y++) {
