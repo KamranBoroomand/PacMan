@@ -11,6 +11,7 @@ A fully static, retro-style Pac-Man browser game with responsive canvas renderin
 - [Scripts](#scripts)
 - [Contributor Testing Guide](#contributor-testing-guide)
 - [Deployment](#deployment)
+- [Website Health Check](#website-health-check)
 - [Security/Quality Notes](#securityquality-notes)
 - [Roadmap](#roadmap)
 
@@ -125,6 +126,12 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080`.
 
+### Option C: Contributor Setup (tests/tooling)
+```bash
+npm install
+npx playwright install chromium
+```
+
 ## Configuration
 Primary gameplay/config constants live in `scripts/game.js`.
 
@@ -198,6 +205,13 @@ Typical GitHub Pages flow:
 2. Ensure root files (`index.html`, `css/`, `scripts/`, `images/`) are published.
 3. Keep `CNAME` in the deployed root to retain custom-domain routing.
 
+## Website Health Check
+Last checked: **February 11, 2026**.
+
+- `npm run check` passed (lint + 31 unit/regression tests).
+- `node --test tests/static-regression.test.js tests/pwa-regression.test.js` passed (8 static/PWA checks).
+- `npm run test:e2e` currently requires installed Playwright tooling (`npm install`, then `npx playwright install chromium`).
+
 ## Security/Quality Notes
 - No backend is used; gameplay runs fully on the client.
 - No authentication or user data processing is present in this codebase.
@@ -209,33 +223,8 @@ Typical GitHub Pages flow:
 - License: MIT (`LICENSE`).
 
 ## Roadmap
-- [x] Arcade-accurate ghost AI (Blinky/Pinky/Inky/Clyde), scatter/chase cycles, and ghost-house release rules.
-- [x] Level progression with speed/difficulty scaling, fruit tables, and bonus-life milestones.
-- [x] Start/round flow polish with start screen, ready phase, life-loss animation, and intermission transitions.
-- [x] HUD/feedback upgrades with ghost-eat point popups, level indicator, and improved overlays.
-- [x] Settings panel with volume, key rebinding, and local persistence.
-- [x] Input expansion with gamepad support and virtual-stick mobile mode.
-- [x] Stronger regression protection with gameplay unit tests and Playwright e2e tests.
-- [x] Performance/compatibility pass with 60 FPS loop and hot-path optimizations.
-- [x] PWA/offline packaging with manifest + service worker.
-- [x] Release workflow polish with quality checks and automated tag/changelog release flow.
-- [x] Arcade-parity deepening with Cruise Elroy phases, per-level mode schedules, and frightened-turn limits.
-- [x] Idle attract mode with demo playback.
-- [x] Intermission cutscenes with skip support.
-- [x] Challenge modes: time attack, no-power-pellet, and one-life run.
-- [x] Replay system with deterministic seed + recorded input playback.
-- [x] Accessibility pass with palette options, reduced motion, and larger HUD text.
-- [x] Expanded regression coverage with deterministic utility tests and optional Playwright visual snapshots.
-- [x] PWA update UX with cache versioning and install/update analytics hooks.
-- [x] Release hardening with semantic version validation and categorized changelog generation.
-- [x] Documentation refresh with architecture flow and contributor testing guide.
-- [x] Full deterministic simulation mode with single-step debugger and seed inspector.
-- [x] Replay v2 with replay export/import and shareable replay links.
-- [x] Daily seeded challenge flow with local history and streak tracking.
-- [x] Local leaderboard per mode/seed with best score and best-time tracking.
-- [x] AI parity harness with deterministic golden-path ghost movement snapshots.
-- [x] Audio polish pass with channel mixer controls, music layer, and ducking.
-- [x] Accessibility expansion with remappable gamepad actions, high-visibility palettes, and one-handed mode.
-- [x] Mobile UX pass with adaptive control sizing, haptics hooks, and orientation-aware layout.
-- [x] CI hardening with visual regression lane and flaky quarantine workflow.
-- [x] Release/channel flow with alpha/stable channel input and rollback guidance.
+The active roadmap is maintained in [`ROADMAP.md`](ROADMAP.md).
+
+Snapshot:
+- Core gameplay, replay, challenge modes, PWA support, and CI/release automation are in place.
+- Next priorities focus on maintainability, broader e2e/browser coverage, and deployment hardening.
