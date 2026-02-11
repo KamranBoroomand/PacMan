@@ -60,6 +60,7 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - Runtime/performance updates:
   - `requestAnimationFrame` game loop targeting smooth 60 FPS.
   - Cached wall tiles and reduced per-frame overhead in hot paths.
+  - Frame-pacing guardrails with stutter detection and analytics hooks.
 - Audio polish:
   - Per-channel mixer controls (master/SFX/music), looped synth bed, and SFX-driven ducking.
 - PWA support:
@@ -86,6 +87,9 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - `css/style.css`: Retro UI styling, responsive layout, and touch-control presentation.
 - `scripts/game.js`: Global game state, level progression, ghost AI orchestration, round phases, controls, settings, audio, PWA hooks, and rendering loop.
 - `scripts/gameplay-utils.js`: Shared gameplay helpers (AI targeting math, collision helpers, level tuning, scoring, and state utilities).
+- `scripts/game-storage.js`: Local persistence helpers for settings, high score, daily state, and leaderboard state.
+- `scripts/replay-tools.js`: Replay serialization/parsing codec utilities.
+- `scripts/perf-guardrails.js`: Frame-time analysis and runtime pacing monitor helpers.
 - `scripts/pacman.js`: `Pacman` class (movement, collision, direction change, pellet consumption, draw logic).
 - `scripts/ghost.js`: `Ghost` class (personality-driven target selection, house-release lifecycle, chase/scatter/frightened/eaten states, movement, draw logic).
 - `scripts/lint.js`: Built-in lint checks (syntax + structural gameplay checks).
@@ -129,7 +133,7 @@ Then open `http://localhost:8080`.
 ### Option C: Contributor Setup (tests/tooling)
 ```bash
 npm install
-npx playwright install chromium
+npx playwright install chromium firefox webkit
 ```
 
 ## Configuration
@@ -158,6 +162,8 @@ Quality scripts are available through `npm`:
 npm run lint
 npm test
 npm run test:e2e
+npm run test:e2e:chromium
+npm run test:e2e:mobile
 npm run test:e2e:visual
 npm run check
 npm run check:all
@@ -167,6 +173,8 @@ PLAYWRIGHT_VISUAL=1 npm run test:e2e
 - `npm run lint`: Syntax + structural lint checks (`scripts/lint.js`).
 - `npm test` / `npm run test:unit`: Unit/regression tests (`tests/*.test.js`) using Node's built-in test runner.
 - `npm run test:e2e`: Browser end-to-end tests with Playwright (`tests/e2e/*.spec.js`).
+- `npm run test:e2e:chromium`: Desktop Chromium-only e2e lane.
+- `npm run test:e2e:mobile`: Mobile Chromium viewport/profile e2e lane.
 - `npm run test:e2e:visual`: Runs Playwright with `PLAYWRIGHT_VISUAL=1` for snapshot checks.
 - `PLAYWRIGHT_VISUAL=1 npm run test:e2e`: Enables visual snapshot assertions in `tests/e2e/visual.spec.js`.
 - `npm run check`: Runs lint + unit tests.

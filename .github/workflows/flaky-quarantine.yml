@@ -30,7 +30,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Run targeted flaky test
-        run: npx playwright test --grep "${{ inputs.test_pattern }}" --retries=2
+        run: npx playwright test --project=desktop-chromium --grep "${{ inputs.test_pattern }}" --retries=2
 
       - name: Upload Playwright report
         if: always()

@@ -6,7 +6,10 @@ const projectRoot = path.resolve(__dirname, "..");
 const syntaxTargets = [
   "scripts/game.js",
   "scripts/ghost.js",
+  "scripts/game-storage.js",
+  "scripts/perf-guardrails.js",
   "scripts/pacman.js",
+  "scripts/replay-tools.js",
   "scripts/gameplay-utils.js",
   "scripts/lint.js",
   "service-worker.js",
@@ -89,15 +92,27 @@ ensureIncludes(indexHtml, 'id="leaderboard-output"', "[leaderboard] Local leader
 ensureIncludes(indexHtml, 'id="virtual-stick"', "[structure] Virtual stick container is missing from index.html.");
 ensureIncludes(indexHtml, "manifest.webmanifest", "[pwa] Web app manifest is not linked from index.html.");
 ensureIncludes(indexHtml, "scripts/gameplay-utils.js", "[structure] gameplay-utils.js is not loaded in index.html.");
+ensureIncludes(indexHtml, "scripts/game-storage.js", "[structure] game-storage.js is not loaded in index.html.");
+ensureIncludes(indexHtml, "scripts/replay-tools.js", "[replay] replay-tools.js is not loaded in index.html.");
+ensureIncludes(indexHtml, "scripts/perf-guardrails.js", "[perf] perf-guardrails.js is not loaded in index.html.");
 
 const gameplayUtilsScriptPosition = indexHtml.indexOf("scripts/gameplay-utils.js");
+const gameStorageScriptPosition = indexHtml.indexOf("scripts/game-storage.js");
+const replayToolsScriptPosition = indexHtml.indexOf("scripts/replay-tools.js");
+const perfGuardrailsScriptPosition = indexHtml.indexOf("scripts/perf-guardrails.js");
 const pacmanScriptPosition = indexHtml.indexOf("scripts/pacman.js");
 if (
   gameplayUtilsScriptPosition === -1 ||
+  gameStorageScriptPosition === -1 ||
+  replayToolsScriptPosition === -1 ||
+  perfGuardrailsScriptPosition === -1 ||
   pacmanScriptPosition === -1 ||
-  gameplayUtilsScriptPosition > pacmanScriptPosition
+  gameplayUtilsScriptPosition > pacmanScriptPosition ||
+  gameStorageScriptPosition > pacmanScriptPosition ||
+  replayToolsScriptPosition > pacmanScriptPosition ||
+  perfGuardrailsScriptPosition > pacmanScriptPosition
 ) {
-  fail("[structure] gameplay-utils.js must load before pacman.js.");
+  fail("[structure] foundational utility scripts must load before pacman.js.");
 }
 
 const gameJs = readText("scripts/game.js");
@@ -117,6 +132,8 @@ ensureIncludes(gameJs, "musicVolume", "[audio] Channel mixer settings are missin
 ensureIncludes(gameJs, "navigator.getGamepads", "[input] Gamepad input support is missing.");
 ensureIncludes(gameJs, "requestAnimationFrame(gameLoop)", "[perf] requestAnimationFrame loop is missing.");
 ensureIncludes(gameJs, "navigator.serviceWorker", "[pwa] Service worker registration is missing.");
+ensureIncludes(gameJs, "createFramePacingMonitor", "[perf] Frame pacing guardrails are missing.");
+ensureIncludes(gameJs, "createReplayCodec", "[replay] Replay codec modularization is missing.");
 
 if (!fs.existsSync(path.join(projectRoot, "manifest.webmanifest"))) {
   fail("[pwa] manifest.webmanifest file is missing.");

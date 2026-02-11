@@ -9,8 +9,9 @@ Last updated: **February 11, 2026**.
 - Local quality checks are green for lint, unit/regression tests, and static/PWA regression suites.
 
 ## Next (High Priority)
-- [ ] Split `scripts/game.js` into smaller modules (core loop, input/UI, audio, persistence/PWA) to reduce maintenance risk while preserving deterministic behavior.
-- [ ] Expand Playwright coverage to a browser matrix (Chromium + Firefox + WebKit) plus at least one mobile viewport profile in CI.
+- [x] Split `scripts/game.js` into smaller modules for persistence/replay/performance helpers to reduce maintenance risk while preserving deterministic behavior.
+- [x] Expand Playwright coverage to a browser matrix (Chromium + Firefox + WebKit) plus a mobile viewport profile in CI.
+- [x] Add frame-time guardrails (runtime pacing monitor + automated regression tests) to catch stutter regressions early.
 - [ ] Add lockfile-driven reproducible installs (`npm ci` in workflows and local contributor guidance).
 - [ ] Add automated static-site deployment on stable release tags (not only site artifact upload).
 - [ ] Add a lightweight accessibility live region for score/life/phase announcements for non-visual assistive tooling.

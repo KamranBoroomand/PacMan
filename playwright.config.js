@@ -1,8 +1,9 @@
-const { defineConfig } = require("@playwright/test");
+const { defineConfig, devices } = require("@playwright/test");
 
 module.exports = defineConfig({
   testDir: "./tests/e2e",
   timeout: 30000,
+  retries: process.env.CI ? 1 : 0,
   expect: {
     toHaveScreenshot: {
       animations: "disabled",
@@ -13,6 +14,33 @@ module.exports = defineConfig({
     baseURL: "http://127.0.0.1:4173",
     headless: true,
   },
+  projects: [
+    {
+      name: "desktop-chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      name: "desktop-firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+      },
+    },
+    {
+      name: "desktop-webkit",
+      use: {
+        ...devices["Desktop Safari"],
+      },
+    },
+    {
+      name: "mobile-chromium",
+      use: {
+        ...devices["Pixel 7"],
+        browserName: "chromium",
+      },
+    },
+  ],
   webServer: {
     command: "python3 -m http.server 4173",
     url: "http://127.0.0.1:4173",

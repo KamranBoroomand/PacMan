@@ -27,18 +27,18 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Install Playwright browser
-        run: npx playwright install chromium
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Lint and unit tests
         run: npm run check
 
-      - name: E2E tests
+      - name: E2E tests (desktop + mobile matrix)
         run: npm run test:e2e
 
       - name: Visual snapshot tests
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_visual }}
-        run: PLAYWRIGHT_VISUAL=1 npm run test:e2e
+        run: PLAYWRIGHT_VISUAL=1 npm run test:e2e -- --project=desktop-chromium
 
   site-artifact:
     name: Build Site Artifact

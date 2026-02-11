@@ -25,5 +25,4 @@ jobs:
         run: npx playwright install chromium
 
       - name: Run visual regression tests
-        run: PLAYWRIGHT_VISUAL=1 npm run test:e2e
-
+        run: PLAYWRIGHT_VISUAL=1 npm run test:e2e -- --project=desktop-chromium

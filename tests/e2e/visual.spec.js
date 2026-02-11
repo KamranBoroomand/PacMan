@@ -4,6 +4,12 @@ const visualEnabled = process.env.PLAYWRIGHT_VISUAL === "1";
 
 test.describe("visual snapshots", () => {
   test.skip(!visualEnabled, "Set PLAYWRIGHT_VISUAL=1 to run visual snapshot assertions.");
+  test.beforeEach(async ({}, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "desktop-chromium",
+      "Visual snapshots run only on desktop Chromium."
+    );
+  });
 
   test("start screen snapshot", async ({ page }) => {
     await page.goto("/");
@@ -21,4 +27,3 @@ test.describe("visual snapshots", () => {
     });
   });
 });
-

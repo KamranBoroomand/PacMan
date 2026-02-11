@@ -89,6 +89,17 @@ const DAILY_CHALLENGE_STORAGE_KEY = "pacman.daily.v1";
 const LEADERBOARD_STORAGE_KEY = "pacman.leaderboard.v1";
 const ARCADE_VIEW_STORAGE_KEY = "pacman.arcadeView.enabled";
 const REPLAY_HASH_PREFIX = "#replay=";
+const PERF_GUARDRAIL_CONFIG = Object.freeze({
+  minSamples: 120,
+  windowSize: 300,
+  slowFrameMs: 34,
+  severeFrameMs: 50,
+  maxSlowRatio: 0.12,
+  maxSevereRatio: 0.03,
+  maxP95Ms: 36,
+  maxP99Ms: 54,
+  breachCooldownMs: 8000,
+});
 const DEFAULT_GAMEPAD_MAP = {
   start: 9,
   pause: 3,
@@ -453,6 +464,10 @@ let simStepRequests = 0;
 let musicLastStepAt = 0;
 let musicStepIndex = 0;
 let musicDuckingUntil = 0;
+let replayCodec = null;
+let framePacingMonitor = null;
+let framePacingSnapshot = null;
+let nextPerfGuardrailToastAt = 0;
 let dailyChallengeState = loadDailyChallengeState();
 let leaderboardState = loadLeaderboardState();
 
@@ -563,6 +578,27 @@ function getGameplayUtils() {
   return null;
 }
 
+function getGameStorage() {
+  if (typeof GameStorage === "object" && GameStorage) {
+    return GameStorage;
+  }
+  return null;
+}
+
+function getReplayTools() {
+  if (typeof ReplayTools === "object" && ReplayTools) {
+    return ReplayTools;
+  }
+  return null;
+}
+
+function getPerfGuardrails() {
+  if (typeof PerfGuardrails === "object" && PerfGuardrails) {
+    return PerfGuardrails;
+  }
+  return null;
+}
+
 function hashSeed(value) {
   const raw = Number.parseInt(String(value || ""), 10);
   if (!Number.isFinite(raw) || raw === 0) {
@@ -587,6 +623,58 @@ function randomIndex(length) {
 
 function createRunSeed() {
   return hashSeed(Date.now() + Math.floor(performance.now()));
+}
+
+function createReplayCodec() {
+  const replayTools = getReplayTools();
+  if (!replayTools || typeof replayTools.createReplayCodec !== "function") {
+    return null;
+  }
+
+  return replayTools.createReplayCodec({
+    hashSeed,
+    challengeModes: CHALLENGE_MODES,
+    defaultChallengeMode: CHALLENGE_MODES.CLASSIC,
+    nowMs: Date.now,
+  });
+}
+
+function getReplayCodec() {
+  if (!replayCodec) {
+    replayCodec = createReplayCodec();
+  }
+  return replayCodec;
+}
+
+function createFramePacingMonitor() {
+  const perf = getPerfGuardrails();
+  if (!perf || typeof perf.createFramePacingMonitor !== "function") {
+    return null;
+  }
+
+  return perf.createFramePacingMonitor({
+    ...PERF_GUARDRAIL_CONFIG,
+    onBreach: (result) => {
+      if (lastUpdateNow < nextPerfGuardrailToastAt) return;
+      nextPerfGuardrailToastAt = lastUpdateNow + PERF_GUARDRAIL_CONFIG.breachCooldownMs;
+      trackAnalyticsEvent("perf_guardrail_breach", {
+        sampleCount: result.sampleCount,
+        p95Ms: Number(result.p95Ms.toFixed(2)),
+        p99Ms: Number(result.p99Ms.toFixed(2)),
+        slowRatio: Number((result.slowRatio * 100).toFixed(2)),
+        severeRatio: Number((result.severeRatio * 100).toFixed(2)),
+        reasons: result.reasons,
+      });
+      addHudToast("Performance dip detected", getCurrentPalette().textMode, 1000);
+    },
+  });
+}
+
+function getFramePacingMonitor() {
+  if (!framePacingMonitor) {
+    framePacingMonitor = createFramePacingMonitor();
+  }
+  return framePacingMonitor;
 }
 
 function getCurrentPalette() {
@@ -770,103 +858,109 @@ function validateSettings(raw) {
 }
 
 function loadSettings() {
-  try {
-    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return validateSettings(DEFAULT_SETTINGS);
-    return validateSettings(JSON.parse(raw));
-  } catch (error) {
-    return validateSettings(DEFAULT_SETTINGS);
+  const storage = getGameStorage();
+  if (storage && typeof storage.loadValidatedSettings === "function") {
+    return storage.loadValidatedSettings({
+      storage: localStorage,
+      key: SETTINGS_STORAGE_KEY,
+      defaults: DEFAULT_SETTINGS,
+      validate: validateSettings,
+    });
   }
+
+  return validateSettings(DEFAULT_SETTINGS);
 }
 
 function persistSettings() {
-  try {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-  } catch (error) {
-    // Ignore settings persistence failures.
+  const storage = getGameStorage();
+  if (storage && typeof storage.persistSettings === "function") {
+    storage.persistSettings({
+      storage: localStorage,
+      key: SETTINGS_STORAGE_KEY,
+      settings,
+    });
   }
 }
 
 function readHighScoreFromStorage() {
-  try {
-    const raw = localStorage.getItem(HIGH_SCORE_STORAGE_KEY);
-    const parsed = Number.parseInt(raw || "0", 10);
-    if (Number.isNaN(parsed) || parsed < 0) return 0;
-    return parsed;
-  } catch (error) {
-    return 0;
+  const storage = getGameStorage();
+  if (storage && typeof storage.readHighScore === "function") {
+    return storage.readHighScore({
+      storage: localStorage,
+      key: HIGH_SCORE_STORAGE_KEY,
+    });
   }
+  return 0;
 }
 
 function persistHighScore() {
-  try {
-    localStorage.setItem(HIGH_SCORE_STORAGE_KEY, String(highScore));
-  } catch (error) {
-    // Ignore storage failures.
+  const storage = getGameStorage();
+  if (storage && typeof storage.persistHighScore === "function") {
+    storage.persistHighScore({
+      storage: localStorage,
+      key: HIGH_SCORE_STORAGE_KEY,
+      highScore,
+    });
   }
 }
 
 function loadDailyChallengeState() {
-  try {
-    const raw = localStorage.getItem(DAILY_CHALLENGE_STORAGE_KEY);
-    if (!raw) {
-      return {
-        streak: 0,
-        lastPlayedDate: "",
-        lastCompletedDate: "",
-        history: [],
-      };
-    }
-
-    const parsed = JSON.parse(raw);
-    const history = Array.isArray(parsed.history) ? parsed.history.slice(-30) : [];
-    return {
-      streak: Math.max(0, Number.parseInt(parsed.streak, 10) || 0),
-      lastPlayedDate: typeof parsed.lastPlayedDate === "string" ? parsed.lastPlayedDate : "",
-      lastCompletedDate: typeof parsed.lastCompletedDate === "string" ? parsed.lastCompletedDate : "",
-      history,
-    };
-  } catch (error) {
-    return {
-      streak: 0,
-      lastPlayedDate: "",
-      lastCompletedDate: "",
-      history: [],
-    };
+  const storage = getGameStorage();
+  if (storage && typeof storage.loadDailyState === "function") {
+    return storage.loadDailyState({
+      storage: localStorage,
+      key: DAILY_CHALLENGE_STORAGE_KEY,
+      maxHistory: 30,
+    });
   }
+
+  return {
+    streak: 0,
+    lastPlayedDate: "",
+    lastCompletedDate: "",
+    history: [],
+  };
 }
 
 function persistDailyChallengeState() {
-  try {
-    localStorage.setItem(DAILY_CHALLENGE_STORAGE_KEY, JSON.stringify(dailyChallengeState));
-  } catch (error) {
-    // Ignore persistence failures.
+  const storage = getGameStorage();
+  if (storage && typeof storage.persistDailyState === "function") {
+    storage.persistDailyState({
+      storage: localStorage,
+      key: DAILY_CHALLENGE_STORAGE_KEY,
+      state: dailyChallengeState,
+    });
   }
 }
 
 function loadLeaderboardState() {
-  try {
-    const raw = localStorage.getItem(LEADERBOARD_STORAGE_KEY);
-    if (!raw) return { entries: {} };
-    const parsed = JSON.parse(raw);
-    const entries = parsed && typeof parsed.entries === "object" && parsed.entries
-      ? parsed.entries
-      : {};
-    return { entries };
-  } catch (error) {
-    return { entries: {} };
+  const storage = getGameStorage();
+  if (storage && typeof storage.loadLeaderboardState === "function") {
+    return storage.loadLeaderboardState({
+      storage: localStorage,
+      key: LEADERBOARD_STORAGE_KEY,
+    });
   }
+
+  return { entries: {} };
 }
 
 function persistLeaderboardState() {
-  try {
-    localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(leaderboardState));
-  } catch (error) {
-    // Ignore persistence failures.
+  const storage = getGameStorage();
+  if (storage && typeof storage.persistLeaderboardState === "function") {
+    storage.persistLeaderboardState({
+      storage: localStorage,
+      key: LEADERBOARD_STORAGE_KEY,
+      state: leaderboardState,
+    });
   }
 }
 
 function getTodayDailyKey() {
+  const storage = getGameStorage();
+  if (storage && typeof storage.getTodayKey === "function") {
+    return storage.getTodayKey(new Date());
+  }
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -1062,6 +1156,21 @@ function renderSeedStatus(message) {
   seedStatus.textContent = message || `Active seed: ${activeRunSeed}`;
 }
 
+function getFramePacingStatusText() {
+  if (!framePacingSnapshot || !Number.isFinite(framePacingSnapshot.sampleCount)) {
+    return "Frame pacing: warming up.";
+  }
+
+  if (framePacingSnapshot.sampleCount < PERF_GUARDRAIL_CONFIG.minSamples) {
+    return `Frame pacing: sampling ${framePacingSnapshot.sampleCount}/${PERF_GUARDRAIL_CONFIG.minSamples}`;
+  }
+
+  const p95 = Number(framePacingSnapshot.p95Ms || 0).toFixed(1);
+  const slowPct = Number((Number(framePacingSnapshot.slowRatio || 0) * 100).toFixed(1));
+  const status = framePacingSnapshot.pass ? "OK" : "WARN";
+  return `Frame pacing ${status} · p95 ${p95}ms · slow ${slowPct}%`;
+}
+
 function renderSimDebugStatus(message) {
   if (simDebugEnabledToggle) {
     simDebugEnabledToggle.checked = Boolean(settings.simDebugEnabled);
@@ -1077,11 +1186,11 @@ function renderSimDebugStatus(message) {
     if (message) {
       simDebugStatus.textContent = message;
     } else if (!settings.simDebugEnabled) {
-      simDebugStatus.textContent = "Realtime simulation mode.";
+      simDebugStatus.textContent = `Realtime simulation mode. ${getFramePacingStatusText()}`;
     } else if (settings.simPaused) {
-      simDebugStatus.textContent = `Paused at frame ${simulationFrame}.`;
+      simDebugStatus.textContent = `Paused at frame ${simulationFrame}. ${getFramePacingStatusText()}`;
     } else {
-      simDebugStatus.textContent = `Running deterministic mode · frame ${simulationFrame}.`;
+      simDebugStatus.textContent = `Running deterministic mode · frame ${simulationFrame}. ${getFramePacingStatusText()}`;
     }
   }
 }
@@ -2308,53 +2417,35 @@ function beginReplayCapture(seed) {
 }
 
 function sanitizeReplayPayload(payload) {
-  if (!payload || typeof payload !== "object") return null;
-  const seed = hashSeed(payload.seed);
-  const challengeMode = Object.values(CHALLENGE_MODES).includes(payload.challengeMode)
-    ? payload.challengeMode
-    : CHALLENGE_MODES.CLASSIC;
-  const events = Array.isArray(payload.events)
-    ? payload.events
-        .filter((entry) => entry && Number.isFinite(Number(entry.frame)) && typeof entry.action === "string")
-        .map((entry) => ({ frame: Math.max(0, Math.floor(Number(entry.frame))), action: entry.action }))
-    : [];
-
-  return {
-    seed,
-    challengeMode,
-    events,
-    startedAt: Number.isFinite(Number(payload.startedAt)) ? Number(payload.startedAt) : Date.now(),
-    endedAt: Number.isFinite(Number(payload.endedAt)) ? Number(payload.endedAt) : Date.now(),
-    score: Number.isFinite(Number(payload.score)) ? Number(payload.score) : 0,
-    level: Number.isFinite(Number(payload.level)) ? Number(payload.level) : 1,
-  };
+  const codec = getReplayCodec();
+  if (codec && typeof codec.sanitize === "function") {
+    return codec.sanitize(payload);
+  }
+  return null;
 }
 
 function encodeReplayToString(replayData) {
-  try {
-    return btoa(unescape(encodeURIComponent(JSON.stringify(replayData))));
-  } catch (error) {
-    return "";
+  const codec = getReplayCodec();
+  if (codec && typeof codec.encode === "function") {
+    return codec.encode(replayData);
   }
+  return "";
 }
 
 function decodeReplayFromString(encoded) {
-  try {
-    const json = decodeURIComponent(escape(atob(encoded)));
-    const parsed = JSON.parse(json);
-    return sanitizeReplayPayload(parsed);
-  } catch (error) {
-    return null;
+  const codec = getReplayCodec();
+  if (codec && typeof codec.decode === "function") {
+    return codec.decode(encoded);
   }
+  return null;
 }
 
 function parseReplayFromUrlHash() {
-  if (!window.location.hash || !window.location.hash.startsWith(REPLAY_HASH_PREFIX)) {
-    return null;
+  const codec = getReplayCodec();
+  if (codec && typeof codec.parseHash === "function") {
+    return codec.parseHash(window.location.hash, REPLAY_HASH_PREFIX);
   }
-  const encoded = window.location.hash.slice(REPLAY_HASH_PREFIX.length);
-  if (!encoded) return null;
-  return decodeReplayFromString(encoded);
+  return null;
 }
 
 function exportReplayToFile() {
@@ -2576,6 +2667,12 @@ function startNewGame(options = {}) {
 
   challengeTimeRemainingMs = CHALLENGE_TIME_ATTACK_SECONDS * 1000;
   simulationFrame = 0;
+  const pacingMonitor = getFramePacingMonitor();
+  if (pacingMonitor && typeof pacingMonitor.reset === "function") {
+    pacingMonitor.reset();
+  }
+  framePacingSnapshot = null;
+  nextPerfGuardrailToastAt = 0;
   disposeActors();
   score = 0;
   lives =
@@ -3607,6 +3704,11 @@ function gameLoop(now) {
   if (!lastUpdateNow) lastUpdateNow = now;
   const delta = Math.min(100, now - lastUpdateNow);
   lastUpdateNow = now;
+
+  const pacingMonitor = getFramePacingMonitor();
+  if (pacingMonitor && typeof pacingMonitor.push === "function") {
+    framePacingSnapshot = pacingMonitor.push(delta, now);
+  }
 
   frameAccumulator += delta;
   while (frameAccumulator >= FRAME_STEP_MS) {

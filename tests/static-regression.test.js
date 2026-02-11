@@ -30,6 +30,9 @@ test("index.html exposes upgraded controls and settings", () => {
   assert.match(indexHtml, /class="keybind-btn"/);
   assert.match(indexHtml, /id="virtual-stick"/);
   assert.match(indexHtml, /manifest\.webmanifest/);
+  assert.match(indexHtml, /scripts\/game-storage\.js/);
+  assert.match(indexHtml, /scripts\/replay-tools\.js/);
+  assert.match(indexHtml, /scripts\/perf-guardrails\.js/);
 });
 
 test("game.js keeps arcade AI, level progression, and phase states", () => {
@@ -53,6 +56,8 @@ test("game.js keeps arcade AI, level progression, and phase states", () => {
   assert.match(gameJs, /finalizeRunResult/);
   assert.match(gameJs, /activeRunIsReplay/);
   assert.match(gameJs, /setSimulationPaused/);
+  assert.match(gameJs, /createReplayCodec/);
+  assert.match(gameJs, /createFramePacingMonitor/);
   assert.match(gameJs, /requestAnimationFrame\(gameLoop\)/);
 });
 
