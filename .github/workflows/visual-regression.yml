@@ -1,0 +1,29 @@
+name: Visual Regression
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  visual:
+    name: Playwright Visual Snapshots
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium
+
+      - name: Run visual regression tests
+        run: PLAYWRIGHT_VISUAL=1 npm run test:e2e
+

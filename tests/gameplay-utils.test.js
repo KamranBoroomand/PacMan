@@ -259,3 +259,27 @@ test("createSeededRandom yields deterministic sequence", () => {
   assert.deepEqual(aValues, bValues);
   assert.notDeepEqual(aValues, cValues);
 });
+
+test("buildGhostPathSnapshot keeps deterministic golden path", () => {
+  const map = [
+    [1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 1],
+    [1, 0, 1, 1, 1, 0, 1],
+    [1, 0, 0, 0, 1, 0, 1],
+    [1, 1, 1, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1],
+  ];
+
+  const snapshot = gameplayUtils.buildGhostPathSnapshot({
+    map,
+    startTile: { x: 1, y: 1 },
+    targetTile: { x: 5, y: 4 },
+    steps: 6,
+    initialDirection: 4,
+    personality: "blinky",
+    mode: "normal",
+  });
+
+  const path = snapshot.map((tile) => `${tile.x},${tile.y}`);
+  assert.deepEqual(path, ["2,1", "3,1", "4,1", "5,1", "5,2", "5,3"]);
+});

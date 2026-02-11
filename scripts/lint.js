@@ -76,11 +76,16 @@ ensureIncludes(indexHtml, 'id="start-game"', "[structure] Start button is missin
 ensureIncludes(indexHtml, 'id="pause-toggle"', "[structure] Pause button is missing from index.html.");
 ensureIncludes(indexHtml, 'id="restart-game"', "[structure] Restart button is missing from index.html.");
 ensureIncludes(indexHtml, 'id="replay-last"', "[structure] Replay button is missing from index.html.");
+ensureIncludes(indexHtml, 'id="daily-challenge"', "[progression] Daily challenge button is missing from index.html.");
 ensureIncludes(indexHtml, 'id="mute-toggle"', "[structure] Mute button is missing from index.html.");
 ensureIncludes(indexHtml, 'id="update-app"', "[pwa] Update button is missing from index.html.");
 ensureIncludes(indexHtml, 'id="mobile-input-mode"', "[structure] Mobile input setting is missing from index.html.");
 ensureIncludes(indexHtml, 'id="challenge-mode"', "[structure] Challenge mode setting is missing from index.html.");
 ensureIncludes(indexHtml, 'id="palette-mode"', "[accessibility] Palette setting is missing from index.html.");
+ensureIncludes(indexHtml, 'id="run-seed-input"', "[debug] Run seed input is missing from index.html.");
+ensureIncludes(indexHtml, 'id="sim-debug-enabled"', "[debug] Deterministic debug toggle is missing from index.html.");
+ensureIncludes(indexHtml, 'id="replay-export"', "[replay] Replay export button is missing from index.html.");
+ensureIncludes(indexHtml, 'id="leaderboard-output"', "[leaderboard] Local leaderboard container is missing from index.html.");
 ensureIncludes(indexHtml, 'id="virtual-stick"', "[structure] Virtual stick container is missing from index.html.");
 ensureIncludes(indexHtml, "manifest.webmanifest", "[pwa] Web app manifest is not linked from index.html.");
 ensureIncludes(indexHtml, "scripts/gameplay-utils.js", "[structure] gameplay-utils.js is not loaded in index.html.");
@@ -104,6 +109,11 @@ ensureIncludes(gameJs, "GHOST_MODE_SCHEDULE_BY_LEVEL", "[ai] Per-level scatter/c
 ensureIncludes(gameJs, "startNextLevel", "[progression] Level progression helper is missing.");
 ensureIncludes(gameJs, "attractModeActive", "[flow] Attract mode state is missing.");
 ensureIncludes(gameJs, "startReplayLastRun", "[replay] Replay system is missing.");
+ensureIncludes(gameJs, "computeDailySeed", "[daily] Daily challenge seed helper is missing.");
+ensureIncludes(gameJs, "finalizeRunResult", "[leaderboard] Run result finalization is missing.");
+ensureIncludes(gameJs, "setSimulationPaused", "[debug] Deterministic step/pause control is missing.");
+ensureIncludes(gameJs, "gamepadMap", "[input] Gamepad remapping is missing.");
+ensureIncludes(gameJs, "musicVolume", "[audio] Channel mixer settings are missing.");
 ensureIncludes(gameJs, "navigator.getGamepads", "[input] Gamepad input support is missing.");
 ensureIncludes(gameJs, "requestAnimationFrame(gameLoop)", "[perf] requestAnimationFrame loop is missing.");
 ensureIncludes(gameJs, "navigator.serviceWorker", "[pwa] Service worker registration is missing.");
@@ -119,6 +129,12 @@ if (!fs.existsSync(path.join(projectRoot, ".github/workflows/quality-checks.yml"
 }
 if (!fs.existsSync(path.join(projectRoot, ".github/workflows/release.yml"))) {
   fail("[release] Release workflow is missing.");
+}
+if (!fs.existsSync(path.join(projectRoot, ".github/workflows/visual-regression.yml"))) {
+  fail("[quality] Visual regression workflow is missing.");
+}
+if (!fs.existsSync(path.join(projectRoot, ".github/workflows/flaky-quarantine.yml"))) {
+  fail("[quality] Flaky quarantine workflow is missing.");
 }
 
 if (failures.length > 0) {

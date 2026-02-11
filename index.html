@@ -52,6 +52,7 @@
       <button id="pause-toggle" class="action-btn" type="button" aria-pressed="false">Pause</button>
       <button id="restart-game" class="action-btn" type="button">Restart</button>
       <button id="replay-last" class="action-btn" type="button" disabled>Replay</button>
+      <button id="daily-challenge" class="action-btn" type="button">Daily</button>
       <button id="mute-toggle" class="action-btn" type="button" aria-pressed="false">Sound: On</button>
       <button id="arcade-view-toggle" class="action-btn desktop-only" type="button" aria-pressed="false">Arcade View</button>
       <button id="install-app" class="action-btn hidden" type="button">Install App</button>
@@ -87,7 +88,7 @@
       <summary>Settings</summary>
       <div class="settings-grid">
         <label class="settings-item" for="volume-control">
-          <span>Volume</span>
+          <span>Master Volume</span>
           <input id="volume-control" type="range" min="0" max="100" step="1" value="70" />
         </label>
 
@@ -97,6 +98,26 @@
             <option value="buttons">Buttons</option>
             <option value="stick">Virtual Stick</option>
           </select>
+        </label>
+
+        <label class="settings-item" for="sfx-volume-control">
+          <span>SFX Volume</span>
+          <input id="sfx-volume-control" type="range" min="0" max="100" step="1" value="78" />
+        </label>
+
+        <label class="settings-item" for="music-volume-control">
+          <span>Music Volume</span>
+          <input id="music-volume-control" type="range" min="0" max="100" step="1" value="40" />
+        </label>
+
+        <label class="settings-item settings-toggle" for="music-enabled">
+          <span>Music</span>
+          <input id="music-enabled" type="checkbox" checked />
+        </label>
+
+        <label class="settings-item settings-toggle" for="haptics-enabled">
+          <span>Haptics</span>
+          <input id="haptics-enabled" type="checkbox" />
         </label>
 
         <label class="settings-item" for="challenge-mode">
@@ -128,6 +149,55 @@
           <input id="large-hud" type="checkbox" />
         </label>
 
+        <label class="settings-item settings-toggle" for="one-handed-mode">
+          <span>One-Handed Mode</span>
+          <input id="one-handed-mode" type="checkbox" />
+        </label>
+
+        <div class="settings-item seed-tools" aria-label="Seed tools">
+          <span>Run Seed</span>
+          <input id="run-seed-input" type="number" min="1" max="2147483646" step="1" value="123456789" />
+          <div class="action-inline">
+            <button id="apply-seed" class="action-btn compact" type="button">Apply & Restart</button>
+            <button id="copy-seed" class="action-btn compact" type="button">Copy Seed</button>
+          </div>
+          <p class="settings-help" id="seed-status">Active seed: 123456789</p>
+        </div>
+
+        <div class="settings-item sim-debug" aria-label="Deterministic debug">
+          <span>Deterministic Debugger</span>
+          <label class="settings-inline-toggle" for="sim-debug-enabled">
+            <span>Enable</span>
+            <input id="sim-debug-enabled" type="checkbox" />
+          </label>
+          <div class="action-inline">
+            <button id="sim-pause" class="action-btn compact" type="button">Pause Sim</button>
+            <button id="sim-step" class="action-btn compact" type="button">Step Frame</button>
+          </div>
+          <p class="settings-help" id="sim-debug-status">Realtime simulation mode.</p>
+        </div>
+
+        <div class="settings-item replay-tools" aria-label="Replay tools">
+          <span>Replay Tools</span>
+          <div class="action-inline">
+            <button id="replay-export" class="action-btn compact" type="button">Export Replay</button>
+            <button id="replay-import" class="action-btn compact" type="button">Import Replay</button>
+            <button id="replay-share" class="action-btn compact" type="button">Copy Replay Link</button>
+          </div>
+          <input id="replay-file-input" type="file" accept="application/json" class="hidden" />
+          <p class="settings-help" id="replay-status">No replay imported.</p>
+        </div>
+
+        <div class="settings-item gamepad-binds" aria-label="Gamepad remap">
+          <span>Gamepad Buttons</span>
+          <div class="gamepad-grid">
+            <label for="gamepad-btn-start">Start<input id="gamepad-btn-start" type="number" min="0" max="17" step="1" value="9" /></label>
+            <label for="gamepad-btn-pause">Pause<input id="gamepad-btn-pause" type="number" min="0" max="17" step="1" value="3" /></label>
+            <label for="gamepad-btn-restart">Restart<input id="gamepad-btn-restart" type="number" min="0" max="17" step="1" value="1" /></label>
+            <label for="gamepad-btn-mute">Mute<input id="gamepad-btn-mute" type="number" min="0" max="17" step="1" value="2" /></label>
+          </div>
+        </div>
+
         <div class="settings-item keybinds" aria-label="Key bindings">
           <span>Keybinds</span>
           <div class="keybind-grid">
@@ -141,6 +211,16 @@
             <button type="button" class="keybind-btn" data-action="start">Start: Enter</button>
           </div>
           <p id="keybind-help" class="settings-help">Click a keybind, then press a key.</p>
+        </div>
+
+        <div class="settings-item daily-panel" aria-label="Daily challenge status">
+          <span>Daily Challenge</span>
+          <p id="daily-status" class="settings-help">No daily runs yet.</p>
+        </div>
+
+        <div class="settings-item leaderboard-panel" aria-label="Local leaderboard">
+          <span>Local Leaderboard</span>
+          <pre id="leaderboard-output" class="leaderboard-output">No scores yet.</pre>
         </div>
       </div>
     </details>

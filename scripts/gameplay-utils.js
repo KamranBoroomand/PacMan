@@ -429,6 +429,86 @@
     return bestCandidate ? bestCandidate.direction : currentDirection;
   }
 
+  function buildGhostPathSnapshot({
+    map,
+    startTile,
+    targetTile,
+    steps = 12,
+    initialDirection = DIRECTION_LEFT,
+    personality = "blinky",
+    mode = "normal",
+  }) {
+    if (!Array.isArray(map) || map.length === 0 || !startTile || !targetTile) {
+      return [];
+    }
+
+    const safeSteps = Math.max(1, toSafeInteger(steps, 12));
+    const path = [];
+    let current = { x: toSafeInteger(startTile.x, 0), y: toSafeInteger(startTile.y, 0) };
+    let currentDirection = initialDirection;
+
+    function nextTile(tile, direction) {
+      const vector = directionToVector(direction);
+      let nextX = tile.x + vector.x;
+      const nextY = tile.y + vector.y;
+      if (vector.x !== 0) {
+        nextX = normalizeTunnelX(map, nextX, tile.y);
+      }
+      if (!isWalkableTile(map, nextX, nextY)) {
+        return null;
+      }
+      return { x: nextX, y: nextY };
+    }
+
+    function opposite(direction) {
+      if (direction === DIRECTION_RIGHT) return DIRECTION_LEFT;
+      if (direction === DIRECTION_LEFT) return DIRECTION_RIGHT;
+      if (direction === DIRECTION_UP) return DIRECTION_BOTTOM;
+      return DIRECTION_UP;
+    }
+
+    for (let stepIndex = 0; stepIndex < safeSteps; stepIndex++) {
+      const candidates = [
+        DIRECTION_UP,
+        DIRECTION_LEFT,
+        DIRECTION_BOTTOM,
+        DIRECTION_RIGHT,
+      ]
+        .map((direction) => {
+          const tile = nextTile(current, direction);
+          if (!tile) return null;
+          return { direction, x: tile.x, y: tile.y };
+        })
+        .filter(Boolean);
+
+      if (candidates.length === 0) break;
+
+      const reverse = opposite(currentDirection);
+      let filtered = candidates;
+      if (candidates.length > 1) {
+        const nonReverse = candidates.filter((entry) => entry.direction !== reverse);
+        if (nonReverse.length > 0) {
+          filtered = nonReverse;
+        }
+      }
+
+      const pickedDirection = pickGhostDirection({
+        candidates: filtered,
+        targetTile,
+        currentDirection,
+        personality,
+        map,
+        mode,
+      });
+      const next = filtered.find((entry) => entry.direction === pickedDirection) || filtered[0];
+      currentDirection = next.direction;
+      current = { x: next.x, y: next.y };
+      path.push({ x: current.x, y: current.y, direction: currentDirection });
+    }
+
+    return path;
+  }
+
   function shouldReleaseGhostFromHouse({
     dotsEatenThisRound,
     releaseDotThreshold,
@@ -535,6 +615,7 @@
   }
 
   const api = {
+    buildGhostPathSnapshot,
     checkRectTileCollision,
     computeBlinkyTargetTile,
     computeClydeTargetTile,

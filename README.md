@@ -43,13 +43,24 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - Replay system:
   - Deterministic run seed + per-frame action capture.
   - Replay button to rerun the last completed attempt.
+  - Export/import replay JSON plus shareable URL hash links.
+- Deterministic simulation debugger:
+  - Seed inspector with apply/copy controls.
+  - Pause/step frame controls for deterministic debugging.
 - Challenge modes:
   - Classic, Time Attack, No Power Pellets, and One Life.
+- Daily challenge mode with date-based seed, local history, and streak tracking.
+- Local leaderboard by mode+seed with best score and best run time.
 - Expanded input support:
   - Keyboard, touch buttons, swipe, virtual stick, and gamepad.
+  - Remappable gamepad action buttons and one-handed accessibility mode.
+- Mobile UX upgrades:
+  - Adaptive control sizing, orientation-aware layout tuning, and optional haptic feedback.
 - Runtime/performance updates:
   - `requestAnimationFrame` game loop targeting smooth 60 FPS.
   - Cached wall tiles and reduced per-frame overhead in hot paths.
+- Audio polish:
+  - Per-channel mixer controls (master/SFX/music), looped synth bed, and SFX-driven ducking.
 - PWA support:
   - Installable app via `manifest.webmanifest`.
   - Offline caching with versioned static/runtime caches.
@@ -57,8 +68,9 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - CI/release upgrades:
   - Unit + e2e test workflows.
   - Optional visual snapshot Playwright specs.
+  - Visual regression lane + flaky-test quarantine workflow.
   - Deployable site artifact workflow.
-  - Manual release tagging with semantic-version validation and categorized changelog workflow.
+  - Manual release tagging with semantic-version validation, alpha/stable channels, categorized changelog, and rollback guide.
 
 ## Tech Stack
 - HTML5
@@ -139,6 +151,7 @@ Quality scripts are available through `npm`:
 npm run lint
 npm test
 npm run test:e2e
+npm run test:e2e:visual
 npm run check
 npm run check:all
 PLAYWRIGHT_VISUAL=1 npm run test:e2e
@@ -147,6 +160,7 @@ PLAYWRIGHT_VISUAL=1 npm run test:e2e
 - `npm run lint`: Syntax + structural lint checks (`scripts/lint.js`).
 - `npm test` / `npm run test:unit`: Unit/regression tests (`tests/*.test.js`) using Node's built-in test runner.
 - `npm run test:e2e`: Browser end-to-end tests with Playwright (`tests/e2e/*.spec.js`).
+- `npm run test:e2e:visual`: Runs Playwright with `PLAYWRIGHT_VISUAL=1` for snapshot checks.
 - `PLAYWRIGHT_VISUAL=1 npm run test:e2e`: Enables visual snapshot assertions in `tests/e2e/visual.spec.js`.
 - `npm run check`: Runs lint + unit tests.
 - `npm run check:all`: Runs lint + unit + e2e tests.
@@ -215,3 +229,13 @@ Typical GitHub Pages flow:
 - [x] PWA update UX with cache versioning and install/update analytics hooks.
 - [x] Release hardening with semantic version validation and categorized changelog generation.
 - [x] Documentation refresh with architecture flow and contributor testing guide.
+- [x] Full deterministic simulation mode with single-step debugger and seed inspector.
+- [x] Replay v2 with replay export/import and shareable replay links.
+- [x] Daily seeded challenge flow with local history and streak tracking.
+- [x] Local leaderboard per mode/seed with best score and best-time tracking.
+- [x] AI parity harness with deterministic golden-path ghost movement snapshots.
+- [x] Audio polish pass with channel mixer controls, music layer, and ducking.
+- [x] Accessibility expansion with remappable gamepad actions, high-visibility palettes, and one-handed mode.
+- [x] Mobile UX pass with adaptive control sizing, haptics hooks, and orientation-aware layout.
+- [x] CI hardening with visual regression lane and flaky quarantine workflow.
+- [x] Release/channel flow with alpha/stable channel input and rollback guidance.

@@ -7,6 +7,14 @@ on:
         description: "Release version (without v prefix), for example 1.4.0"
         required: true
         type: string
+      channel:
+        description: "Release channel"
+        required: true
+        type: choice
+        default: stable
+        options:
+          - stable
+          - alpha
       publish_release:
         description: "Publish release (unchecked creates a draft)"
         required: true
@@ -46,8 +54,13 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          TAG="v${{ inputs.version }}"
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ "${{ inputs.channel }}" = "alpha" ]; then
+            TAG="alpha-v${{ inputs.version }}"
+            LAST_TAG=$(git tag --list 'alpha-v*' --sort=-version:refname | head -n 1 || true)
+          else
+            TAG="v${{ inputs.version }}"
+            LAST_TAG=$(git tag --list 'v*' --sort=-version:refname | head -n 1 || true)
+          fi
           RANGE="HEAD"
           if [ -n "$LAST_TAG" ]; then
             RANGE="${LAST_TAG}..HEAD"
@@ -77,6 +90,8 @@ jobs:
           {
             echo "# PacMan ${TAG}"
             echo
+            echo "Channel: **${{ inputs.channel }}**"
+            echo
             if [ -n "$LAST_TAG" ]; then
               echo "Changes since ${LAST_TAG}"
             else
@@ -94,12 +109,22 @@ jobs:
             echo
             echo "## Chore & Other"
             echo "${CHORE:-_No additional commits._}"
+            echo
+            echo "## Rollback Guide"
+            echo "1. Re-deploy previous stable tag."
+            echo "2. Disable current release in distribution channel."
+            echo "3. Verify PWA cache by bumping service-worker cache version in follow-up patch."
+            echo "4. Publish rollback notes referencing the restored tag."
           } > RELEASE_NOTES.md
 
       - name: Create and push git tag
         id: tag
         run: |
-          TAG="v${{ inputs.version }}"
+          if [ "${{ inputs.channel }}" = "alpha" ]; then
+            TAG="alpha-v${{ inputs.version }}"
+          else
+            TAG="v${{ inputs.version }}"
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
@@ -117,6 +142,7 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.tag_name }}
           body_path: RELEASE_NOTES.md
+          prerelease: ${{ inputs.channel == 'alpha' }}
           draft: ${{ !inputs.publish_release }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

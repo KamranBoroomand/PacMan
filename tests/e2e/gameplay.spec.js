@@ -57,3 +57,13 @@ test("replay button exists and starts disabled", async ({ page }) => {
   await expect(replayButton).toBeVisible();
   await expect(replayButton).toBeDisabled();
 });
+
+test("daily and deterministic debug controls are accessible", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("#daily-challenge")).toBeVisible();
+
+  await page.getByText("Settings", { exact: true }).click();
+  await expect(page.locator("#run-seed-input")).toBeVisible();
+  await expect(page.locator("#sim-debug-enabled")).toBeVisible();
+  await expect(page.locator("#replay-export")).toBeVisible();
+});

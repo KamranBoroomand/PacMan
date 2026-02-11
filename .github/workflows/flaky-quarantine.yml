@@ -1,0 +1,40 @@
+name: Flaky Quarantine
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_pattern:
+        description: "Playwright grep pattern for quarantined tests"
+        required: true
+        type: string
+
+jobs:
+  quarantine:
+    name: Quarantine Playwright Spec
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium
+
+      - name: Run targeted flaky test
+        run: npx playwright test --grep "${{ inputs.test_pattern }}" --retries=2
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quarantine-playwright-report
+          path: playwright-report

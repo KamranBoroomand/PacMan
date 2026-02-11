@@ -10,12 +10,37 @@ const arcadeViewToggleButton = document.getElementById("arcade-view-toggle");
 const installAppButton = document.getElementById("install-app");
 const updateAppButton = document.getElementById("update-app");
 const replayLastButton = document.getElementById("replay-last");
+const dailyChallengeButton = document.getElementById("daily-challenge");
+const replayExportButton = document.getElementById("replay-export");
+const replayImportButton = document.getElementById("replay-import");
+const replayShareButton = document.getElementById("replay-share");
+const replayFileInput = document.getElementById("replay-file-input");
 const volumeControl = document.getElementById("volume-control");
+const sfxVolumeControl = document.getElementById("sfx-volume-control");
+const musicVolumeControl = document.getElementById("music-volume-control");
+const musicEnabledToggle = document.getElementById("music-enabled");
+const hapticsEnabledToggle = document.getElementById("haptics-enabled");
 const mobileInputModeSelect = document.getElementById("mobile-input-mode");
 const challengeModeSelect = document.getElementById("challenge-mode");
 const paletteModeSelect = document.getElementById("palette-mode");
 const reducedMotionToggle = document.getElementById("reduced-motion");
 const largeHudToggle = document.getElementById("large-hud");
+const oneHandedModeToggle = document.getElementById("one-handed-mode");
+const runSeedInput = document.getElementById("run-seed-input");
+const applySeedButton = document.getElementById("apply-seed");
+const copySeedButton = document.getElementById("copy-seed");
+const seedStatus = document.getElementById("seed-status");
+const simDebugEnabledToggle = document.getElementById("sim-debug-enabled");
+const simPauseButton = document.getElementById("sim-pause");
+const simStepButton = document.getElementById("sim-step");
+const simDebugStatus = document.getElementById("sim-debug-status");
+const replayStatus = document.getElementById("replay-status");
+const dailyStatus = document.getElementById("daily-status");
+const leaderboardOutput = document.getElementById("leaderboard-output");
+const gamepadStartInput = document.getElementById("gamepad-btn-start");
+const gamepadPauseInput = document.getElementById("gamepad-btn-pause");
+const gamepadRestartInput = document.getElementById("gamepad-btn-restart");
+const gamepadMuteInput = document.getElementById("gamepad-btn-mute");
 const settingsPanel = document.getElementById("settings-panel");
 const keybindButtons = Array.from(document.querySelectorAll(".keybind-btn[data-action]"));
 const keybindHelp = document.getElementById("keybind-help");
@@ -60,7 +85,17 @@ const MIN_FRUIT_SPAWN_DISTANCE = 8;
 const MIN_GHOST_INITIAL_SPAWN_DISTANCE = 7;
 const SETTINGS_STORAGE_KEY = "pacman.settings.v1";
 const HIGH_SCORE_STORAGE_KEY = "pacman.highScore";
+const DAILY_CHALLENGE_STORAGE_KEY = "pacman.daily.v1";
+const LEADERBOARD_STORAGE_KEY = "pacman.leaderboard.v1";
 const ARCADE_VIEW_STORAGE_KEY = "pacman.arcadeView.enabled";
+const REPLAY_HASH_PREFIX = "#replay=";
+const DEFAULT_GAMEPAD_MAP = {
+  start: 9,
+  pause: 3,
+  restart: 1,
+  mute: 2,
+};
+const MUSIC_STEP_INTERVAL_MS = 250;
 const GHOST_HOME_TILE = { x: 21, y: 13 };
 const GHOST_HOUSE_EXIT_TILE = { x: 21, y: 12 };
 const GHOST_HOUSE_EXIT_BY_PERSONALITY = {
@@ -287,11 +322,19 @@ const DEFAULT_KEYBINDS = {
 const DEFAULT_SETTINGS = {
   muted: false,
   volume: 70,
+  sfxVolume: 78,
+  musicVolume: 40,
+  musicEnabled: true,
+  hapticsEnabled: false,
   mobileInputMode: "buttons",
   challengeMode: CHALLENGE_MODES.CLASSIC,
   paletteMode: "classic",
   reducedMotion: false,
   largeHud: false,
+  oneHandedMode: false,
+  simDebugEnabled: false,
+  simPaused: false,
+  gamepadMap: { ...DEFAULT_GAMEPAD_MAP },
   keybinds: { ...DEFAULT_KEYBINDS },
 };
 
@@ -329,6 +372,15 @@ const SFX_LIBRARY = {
   ui: [{ frequency: 460, duration: 0.04, volume: 0.08, wave: "square", offset: 0 }],
 };
 
+const MUSIC_SEQUENCE = [
+  { frequency: 262, duration: 0.18, volume: 0.08, wave: "triangle" },
+  { frequency: 330, duration: 0.18, volume: 0.08, wave: "triangle" },
+  { frequency: 392, duration: 0.18, volume: 0.08, wave: "triangle" },
+  { frequency: 523, duration: 0.2, volume: 0.09, wave: "triangle" },
+  { frequency: 392, duration: 0.18, volume: 0.08, wave: "triangle" },
+  { frequency: 330, duration: 0.18, volume: 0.08, wave: "triangle" },
+];
+
 let renderScale = 1;
 let dpr = 1;
 let logicalW = 0;
@@ -358,6 +410,7 @@ let currentGhostModeSchedule = GHOST_MODE_SCHEDULE;
 let dotsEatenThisRound = 0;
 let remainingFoodCount = 0;
 let initialFoodCount = 0;
+let levelsClearedThisRun = 0;
 let pointPopups = [];
 let hudToasts = [];
 let lastUpdateNow = performance.now();
@@ -368,11 +421,14 @@ let swipeStartY = null;
 let stickPointerId = null;
 let stickCenterX = 0;
 let stickCenterY = 0;
+let stickMaxRadius = STICK_MAX_RADIUS;
 let pendingRebindAction = null;
 let settings = loadSettings();
 let arcadeViewEnabled = false;
 let audioContext = null;
 let audioMasterGain = null;
+let audioSfxGain = null;
+let audioMusicGain = null;
 let deferredInstallPrompt = null;
 let swRegistration = null;
 let swUpdateReady = false;
@@ -389,6 +445,16 @@ let runRandomState = 1;
 let replayCurrentRun = null;
 let replayLastRun = null;
 let replayPlayback = null;
+let runStartedAtMs = 0;
+let activeRunIsDaily = false;
+let activeRunIsReplay = false;
+let runResultCommitted = false;
+let simStepRequests = 0;
+let musicLastStepAt = 0;
+let musicStepIndex = 0;
+let musicDuckingUntil = 0;
+let dailyChallengeState = loadDailyChallengeState();
+let leaderboardState = loadLeaderboardState();
 
 let fruit = {
   active: false,
@@ -551,6 +617,7 @@ function noteUserIntent() {
 
   if (isReplayRunning()) {
     replayPlayback = null;
+    activeRunIsReplay = false;
     renderReplayButton();
     addHudToast("Replay canceled", getCurrentPalette().textMode, 900);
   }
@@ -652,12 +719,30 @@ function validateSettings(raw) {
     volume: Number.isFinite(Number(raw && raw.volume))
       ? Math.max(0, Math.min(100, Number(raw.volume)))
       : DEFAULT_SETTINGS.volume,
+    sfxVolume: Number.isFinite(Number(raw && raw.sfxVolume))
+      ? Math.max(0, Math.min(100, Number(raw.sfxVolume)))
+      : DEFAULT_SETTINGS.sfxVolume,
+    musicVolume: Number.isFinite(Number(raw && raw.musicVolume))
+      ? Math.max(0, Math.min(100, Number(raw.musicVolume)))
+      : DEFAULT_SETTINGS.musicVolume,
+    musicEnabled:
+      typeof (raw && raw.musicEnabled) === "boolean"
+        ? raw.musicEnabled
+        : DEFAULT_SETTINGS.musicEnabled,
+    hapticsEnabled:
+      typeof (raw && raw.hapticsEnabled) === "boolean"
+        ? raw.hapticsEnabled
+        : DEFAULT_SETTINGS.hapticsEnabled,
     mobileInputMode:
       raw && raw.mobileInputMode === "stick" ? "stick" : "buttons",
     challengeMode,
     paletteMode,
     reducedMotion: Boolean(raw && raw.reducedMotion),
     largeHud: Boolean(raw && raw.largeHud),
+    oneHandedMode: Boolean(raw && raw.oneHandedMode),
+    simDebugEnabled: Boolean(raw && raw.simDebugEnabled),
+    simPaused: Boolean(raw && raw.simPaused),
+    gamepadMap: { ...DEFAULT_GAMEPAD_MAP },
     keybinds: { ...DEFAULT_KEYBINDS },
   };
 
@@ -668,6 +753,16 @@ function validateSettings(raw) {
     const normalized = normalizeKeyName(incomingKeybinds[action]);
     if (normalized) {
       safe.keybinds[action] = normalized;
+    }
+  }
+
+  const incomingMap = raw && raw.gamepadMap ? raw.gamepadMap : {};
+  const gamepadMapKeys = Object.keys(DEFAULT_GAMEPAD_MAP);
+  for (let i = 0; i < gamepadMapKeys.length; i++) {
+    const key = gamepadMapKeys[i];
+    const parsed = Number.parseInt(incomingMap[key], 10);
+    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 17) {
+      safe.gamepadMap[key] = parsed;
     }
   }
 
@@ -709,6 +804,159 @@ function persistHighScore() {
   } catch (error) {
     // Ignore storage failures.
   }
+}
+
+function loadDailyChallengeState() {
+  try {
+    const raw = localStorage.getItem(DAILY_CHALLENGE_STORAGE_KEY);
+    if (!raw) {
+      return {
+        streak: 0,
+        lastPlayedDate: "",
+        lastCompletedDate: "",
+        history: [],
+      };
+    }
+
+    const parsed = JSON.parse(raw);
+    const history = Array.isArray(parsed.history) ? parsed.history.slice(-30) : [];
+    return {
+      streak: Math.max(0, Number.parseInt(parsed.streak, 10) || 0),
+      lastPlayedDate: typeof parsed.lastPlayedDate === "string" ? parsed.lastPlayedDate : "",
+      lastCompletedDate: typeof parsed.lastCompletedDate === "string" ? parsed.lastCompletedDate : "",
+      history,
+    };
+  } catch (error) {
+    return {
+      streak: 0,
+      lastPlayedDate: "",
+      lastCompletedDate: "",
+      history: [],
+    };
+  }
+}
+
+function persistDailyChallengeState() {
+  try {
+    localStorage.setItem(DAILY_CHALLENGE_STORAGE_KEY, JSON.stringify(dailyChallengeState));
+  } catch (error) {
+    // Ignore persistence failures.
+  }
+}
+
+function loadLeaderboardState() {
+  try {
+    const raw = localStorage.getItem(LEADERBOARD_STORAGE_KEY);
+    if (!raw) return { entries: {} };
+    const parsed = JSON.parse(raw);
+    const entries = parsed && typeof parsed.entries === "object" && parsed.entries
+      ? parsed.entries
+      : {};
+    return { entries };
+  } catch (error) {
+    return { entries: {} };
+  }
+}
+
+function persistLeaderboardState() {
+  try {
+    localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(leaderboardState));
+  } catch (error) {
+    // Ignore persistence failures.
+  }
+}
+
+function getTodayDailyKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function computeDailySeed(dateKey) {
+  return hashSeed(String(dateKey).replaceAll("-", ""));
+}
+
+function addLeaderboardResult({ mode, seed, scoreValue, durationMs, completed, dateKey }) {
+  if (!leaderboardState || typeof leaderboardState !== "object") {
+    leaderboardState = { entries: {} };
+  }
+  if (!leaderboardState.entries || typeof leaderboardState.entries !== "object") {
+    leaderboardState.entries = {};
+  }
+
+  const normalizedMode = mode || CHALLENGE_MODES.CLASSIC;
+  const normalizedSeed = Number.parseInt(seed, 10) || 0;
+  const key = `${normalizedMode}:${normalizedSeed}`;
+  const existing = leaderboardState.entries[key] || {
+    mode: normalizedMode,
+    seed: normalizedSeed,
+    bestScore: 0,
+    bestTimeMs: Infinity,
+    completedRuns: 0,
+    runs: 0,
+    lastPlayed: "",
+  };
+
+  existing.runs += 1;
+  if (completed) {
+    existing.completedRuns += 1;
+  }
+  existing.bestScore = Math.max(existing.bestScore, Math.max(0, Number.parseInt(scoreValue, 10) || 0));
+  if (Number.isFinite(durationMs) && durationMs > 0) {
+    existing.bestTimeMs = Math.min(existing.bestTimeMs, durationMs);
+  }
+  existing.lastPlayed = dateKey || getTodayDailyKey();
+
+  leaderboardState.entries[key] = existing;
+  persistLeaderboardState();
+}
+
+function addDailyHistoryEntry({ dateKey, seed, scoreValue, completed }) {
+  if (!dailyChallengeState || typeof dailyChallengeState !== "object") {
+    dailyChallengeState = loadDailyChallengeState();
+  }
+  const safeDate = dateKey || getTodayDailyKey();
+  const history = Array.isArray(dailyChallengeState.history) ? dailyChallengeState.history : [];
+
+  const previousIndex = history.findIndex((entry) => entry && entry.date === safeDate);
+  const nextEntry = {
+    date: safeDate,
+    seed,
+    score: Math.max(0, Number.parseInt(scoreValue, 10) || 0),
+    completed: Boolean(completed),
+  };
+
+  if (previousIndex >= 0) {
+    history[previousIndex] = nextEntry;
+  } else {
+    history.push(nextEntry);
+  }
+
+  history.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  dailyChallengeState.history = history.slice(-30);
+  dailyChallengeState.lastPlayedDate = safeDate;
+
+  const yesterday = new Date(`${safeDate}T00:00:00`);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const y = yesterday.getFullYear();
+  const m = String(yesterday.getMonth() + 1).padStart(2, "0");
+  const d = String(yesterday.getDate()).padStart(2, "0");
+  const yesterdayKey = `${y}-${m}-${d}`;
+
+  if (nextEntry.completed) {
+    if (dailyChallengeState.lastCompletedDate === yesterdayKey) {
+      dailyChallengeState.streak += 1;
+    } else if (dailyChallengeState.lastCompletedDate !== safeDate) {
+      dailyChallengeState.streak = 1;
+    }
+    dailyChallengeState.lastCompletedDate = safeDate;
+  } else if (dailyChallengeState.lastCompletedDate && dailyChallengeState.lastCompletedDate < yesterdayKey) {
+    dailyChallengeState.streak = 0;
+  }
+
+  persistDailyChallengeState();
 }
 
 function syncHighScore() {
@@ -791,9 +1039,117 @@ function renderReplayButton() {
   replayLastButton.textContent = isReplayRunning() ? "Replaying..." : "Replay";
 }
 
+function renderReplayStatus(message) {
+  if (!replayStatus) return;
+  if (message) {
+    replayStatus.textContent = message;
+    return;
+  }
+
+  if (replayLastRun && Array.isArray(replayLastRun.events)) {
+    replayStatus.textContent =
+      `Last replay: ${replayLastRun.events.length} inputs · seed ${replayLastRun.seed}`;
+  } else {
+    replayStatus.textContent = "No replay imported.";
+  }
+}
+
+function renderSeedStatus(message) {
+  if (runSeedInput) {
+    runSeedInput.value = String(activeRunSeed);
+  }
+  if (!seedStatus) return;
+  seedStatus.textContent = message || `Active seed: ${activeRunSeed}`;
+}
+
+function renderSimDebugStatus(message) {
+  if (simDebugEnabledToggle) {
+    simDebugEnabledToggle.checked = Boolean(settings.simDebugEnabled);
+  }
+  if (simPauseButton) {
+    simPauseButton.disabled = !settings.simDebugEnabled;
+    simPauseButton.textContent = settings.simPaused ? "Resume Sim" : "Pause Sim";
+  }
+  if (simStepButton) {
+    simStepButton.disabled = !settings.simDebugEnabled;
+  }
+  if (simDebugStatus) {
+    if (message) {
+      simDebugStatus.textContent = message;
+    } else if (!settings.simDebugEnabled) {
+      simDebugStatus.textContent = "Realtime simulation mode.";
+    } else if (settings.simPaused) {
+      simDebugStatus.textContent = `Paused at frame ${simulationFrame}.`;
+    } else {
+      simDebugStatus.textContent = `Running deterministic mode · frame ${simulationFrame}.`;
+    }
+  }
+}
+
+function formatDurationShort(durationMs) {
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return "--";
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function renderDailyStatus() {
+  if (!dailyStatus) return;
+  const todayKey = getTodayDailyKey();
+  const todaySeed = computeDailySeed(todayKey);
+  const completedToday = dailyChallengeState.lastCompletedDate === todayKey;
+  const playedToday = dailyChallengeState.lastPlayedDate === todayKey;
+  const streak = Math.max(0, Number.parseInt(dailyChallengeState.streak, 10) || 0);
+
+  let statusLine = `Today (${todayKey}) seed ${todaySeed}`;
+  if (completedToday) {
+    statusLine += " · completed";
+  } else if (playedToday) {
+    statusLine += " · attempted";
+  }
+
+  dailyStatus.textContent = `${statusLine}\nStreak: ${streak} day${streak === 1 ? "" : "s"}`;
+
+  if (dailyChallengeButton) {
+    dailyChallengeButton.textContent = completedToday ? "Daily Done" : "Daily";
+    dailyChallengeButton.setAttribute("aria-pressed", String(completedToday));
+  }
+}
+
+function renderLeaderboard() {
+  if (!leaderboardOutput) return;
+
+  const entries = Object.values((leaderboardState && leaderboardState.entries) || {});
+  if (entries.length === 0) {
+    leaderboardOutput.textContent = "No scores yet.";
+    return;
+  }
+
+  entries.sort((a, b) => {
+    if (b.bestScore !== a.bestScore) return b.bestScore - a.bestScore;
+    return (a.bestTimeMs || Infinity) - (b.bestTimeMs || Infinity);
+  });
+
+  const lines = [];
+  const top = entries.slice(0, 8);
+  for (let i = 0; i < top.length; i++) {
+    const entry = top[i];
+    lines.push(
+      `${i + 1}. ${entry.mode} · seed ${entry.seed} · score ${entry.bestScore} · best ${formatDurationShort(entry.bestTimeMs)} · runs ${entry.runs}`
+    );
+  }
+  leaderboardOutput.textContent = lines.join("\n");
+}
+
 function applyAccessibilitySettings() {
   document.body.classList.toggle("reduced-motion", settings.reducedMotion);
   document.body.classList.toggle("large-hud", settings.largeHud);
+  document.body.classList.toggle("one-handed", settings.oneHandedMode);
+
+  const coarsePointer = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+  const landscapeMobile = coarsePointer && window.innerWidth > window.innerHeight;
+  document.body.classList.toggle("landscape-mobile", landscapeMobile);
 }
 
 function renderArcadeViewButton() {
@@ -849,6 +1205,18 @@ function renderSettingsUi() {
   if (volumeControl) {
     volumeControl.value = String(settings.volume);
   }
+  if (sfxVolumeControl) {
+    sfxVolumeControl.value = String(settings.sfxVolume);
+  }
+  if (musicVolumeControl) {
+    musicVolumeControl.value = String(settings.musicVolume);
+  }
+  if (musicEnabledToggle) {
+    musicEnabledToggle.checked = Boolean(settings.musicEnabled);
+  }
+  if (hapticsEnabledToggle) {
+    hapticsEnabledToggle.checked = Boolean(settings.hapticsEnabled);
+  }
   if (mobileInputModeSelect) {
     mobileInputModeSelect.value = settings.mobileInputMode;
   }
@@ -864,6 +1232,21 @@ function renderSettingsUi() {
   if (largeHudToggle) {
     largeHudToggle.checked = Boolean(settings.largeHud);
   }
+  if (oneHandedModeToggle) {
+    oneHandedModeToggle.checked = Boolean(settings.oneHandedMode);
+  }
+  if (gamepadStartInput) {
+    gamepadStartInput.value = String(settings.gamepadMap.start);
+  }
+  if (gamepadPauseInput) {
+    gamepadPauseInput.value = String(settings.gamepadMap.pause);
+  }
+  if (gamepadRestartInput) {
+    gamepadRestartInput.value = String(settings.gamepadMap.restart);
+  }
+  if (gamepadMuteInput) {
+    gamepadMuteInput.value = String(settings.gamepadMap.mute);
+  }
   renderKeybindButtons();
   if (keybindHelp) {
     keybindHelp.textContent = pendingRebindAction
@@ -871,6 +1254,72 @@ function renderSettingsUi() {
       : "Click a keybind, then press a key.";
   }
   applyAccessibilitySettings();
+  renderSeedStatus();
+  renderSimDebugStatus();
+  renderReplayStatus();
+  renderDailyStatus();
+  renderLeaderboard();
+}
+
+function applyGamepadMapFromInputs() {
+  const pairs = [
+    [gamepadStartInput, "start"],
+    [gamepadPauseInput, "pause"],
+    [gamepadRestartInput, "restart"],
+    [gamepadMuteInput, "mute"],
+  ];
+
+  for (let i = 0; i < pairs.length; i++) {
+    const input = pairs[i][0];
+    const key = pairs[i][1];
+    if (!input) continue;
+    const parsed = Number.parseInt(input.value, 10);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 17) {
+      input.value = String(settings.gamepadMap[key]);
+      continue;
+    }
+    settings.gamepadMap[key] = parsed;
+  }
+
+  persistSettings();
+}
+
+function applyRunSeedFromInput() {
+  if (!runSeedInput) return;
+  const parsed = Number.parseInt(runSeedInput.value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    renderSeedStatus("Seed must be a positive integer.");
+    return;
+  }
+  startNewGame({ seed: parsed });
+  renderSeedStatus(`Applied seed: ${activeRunSeed}`);
+}
+
+function copyCurrentSeed() {
+  const text = String(activeRunSeed);
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    navigator.clipboard.writeText(text)
+      .then(() => renderSeedStatus("Seed copied to clipboard."))
+      .catch(() => renderSeedStatus(`Active seed: ${activeRunSeed}`));
+    return;
+  }
+  renderSeedStatus(`Active seed: ${activeRunSeed}`);
+}
+
+function setSimulationPaused(nextPaused) {
+  settings.simPaused = Boolean(nextPaused);
+  persistSettings();
+  renderSimDebugStatus();
+}
+
+function requestSimulationStep() {
+  if (!settings.simDebugEnabled) return;
+  if (!settings.simPaused) {
+    settings.simPaused = true;
+  }
+  simStepRequests += 1;
+  persistSettings();
+  renderSimDebugStatus(`Stepping from frame ${simulationFrame}.`);
 }
 
 function validateMapRectangular() {
@@ -1161,6 +1610,10 @@ function ensureAudioContextReady() {
   if (!audioContext) {
     audioContext = new AudioContextClass();
     audioMasterGain = audioContext.createGain();
+    audioSfxGain = audioContext.createGain();
+    audioMusicGain = audioContext.createGain();
+    audioSfxGain.connect(audioMasterGain);
+    audioMusicGain.connect(audioMasterGain);
     audioMasterGain.connect(audioContext.destination);
   }
 
@@ -1175,16 +1628,22 @@ function ensureAudioContextReady() {
 }
 
 function applyAudioSettings() {
-  if (!audioMasterGain || !audioContext) return;
+  if (!audioMasterGain || !audioContext || !audioSfxGain || !audioMusicGain) return;
   const volumeScale = Math.max(0, Math.min(1, settings.volume / 100));
   const targetGain = settings.muted ? 0 : BASE_AUDIO_GAIN * volumeScale;
   audioMasterGain.gain.setValueAtTime(targetGain, audioContext.currentTime);
+
+  const sfxScale = Math.max(0, Math.min(1, settings.sfxVolume / 100));
+  const musicScale = Math.max(0, Math.min(1, settings.musicVolume / 100));
+  const duckingScale = lastUpdateNow < musicDuckingUntil ? 0.35 : 1;
+  audioSfxGain.gain.setValueAtTime(sfxScale, audioContext.currentTime);
+  audioMusicGain.gain.setValueAtTime(settings.musicEnabled ? musicScale * duckingScale : 0, audioContext.currentTime);
 }
 
-function playTone({ frequency, duration, volume, wave, offset }) {
+function playTone({ frequency, duration, volume, wave, offset, channel }) {
   if (settings.muted) return;
   const ctx = ensureAudioContextReady();
-  if (!ctx || !audioMasterGain) return;
+  if (!ctx || !audioMasterGain || !audioSfxGain || !audioMusicGain) return;
 
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -1199,7 +1658,7 @@ function playTone({ frequency, duration, volume, wave, offset }) {
   gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
 
   osc.connect(gain);
-  gain.connect(audioMasterGain);
+  gain.connect(channel === "music" ? audioMusicGain : audioSfxGain);
   osc.start(startTime);
   osc.stop(endTime + 0.01);
 }
@@ -1207,9 +1666,45 @@ function playTone({ frequency, duration, volume, wave, offset }) {
 function playGameSfx(type) {
   const pattern = SFX_LIBRARY[type];
   if (!Array.isArray(pattern)) return;
+  musicDuckingUntil = Math.max(musicDuckingUntil, lastUpdateNow + 200);
+  applyAudioSettings();
   for (let i = 0; i < pattern.length; i++) {
-    playTone(pattern[i]);
+    playTone({ ...pattern[i], channel: "sfx" });
   }
+
+  triggerHapticFeedback(type);
+}
+
+function updateBackgroundMusic() {
+  if (!settings.musicEnabled || settings.muted) return;
+  if (phase !== GAME_PHASE_PLAYING && phase !== GAME_PHASE_READY) return;
+  if (!audioContext || !audioMusicGain) return;
+  if (lastUpdateNow - musicLastStepAt < MUSIC_STEP_INTERVAL_MS) return;
+
+  musicLastStepAt = lastUpdateNow;
+  const note = MUSIC_SEQUENCE[musicStepIndex % MUSIC_SEQUENCE.length];
+  musicStepIndex = (musicStepIndex + 1) % MUSIC_SEQUENCE.length;
+  if (note) {
+    playTone({ ...note, channel: "music" });
+  }
+}
+
+function triggerHapticFeedback(type) {
+  if (!settings.hapticsEnabled) return;
+  if (typeof navigator.vibrate !== "function") return;
+
+  if (type === "pellet") {
+    return;
+  }
+  if (type === "death") {
+    navigator.vibrate([28, 20, 28]);
+    return;
+  }
+  if (type === "powerPellet" || type === "ghostEaten") {
+    navigator.vibrate([12, 14, 12]);
+    return;
+  }
+  navigator.vibrate(10);
 }
 
 function addHudToast(text, color = getCurrentPalette().textHigh, durationMs = 1400) {
@@ -1739,6 +2234,118 @@ function beginReplayCapture(seed) {
   };
 }
 
+function sanitizeReplayPayload(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  const seed = hashSeed(payload.seed);
+  const challengeMode = Object.values(CHALLENGE_MODES).includes(payload.challengeMode)
+    ? payload.challengeMode
+    : CHALLENGE_MODES.CLASSIC;
+  const events = Array.isArray(payload.events)
+    ? payload.events
+        .filter((entry) => entry && Number.isFinite(Number(entry.frame)) && typeof entry.action === "string")
+        .map((entry) => ({ frame: Math.max(0, Math.floor(Number(entry.frame))), action: entry.action }))
+    : [];
+
+  return {
+    seed,
+    challengeMode,
+    events,
+    startedAt: Number.isFinite(Number(payload.startedAt)) ? Number(payload.startedAt) : Date.now(),
+    endedAt: Number.isFinite(Number(payload.endedAt)) ? Number(payload.endedAt) : Date.now(),
+    score: Number.isFinite(Number(payload.score)) ? Number(payload.score) : 0,
+    level: Number.isFinite(Number(payload.level)) ? Number(payload.level) : 1,
+  };
+}
+
+function encodeReplayToString(replayData) {
+  try {
+    return btoa(unescape(encodeURIComponent(JSON.stringify(replayData))));
+  } catch (error) {
+    return "";
+  }
+}
+
+function decodeReplayFromString(encoded) {
+  try {
+    const json = decodeURIComponent(escape(atob(encoded)));
+    const parsed = JSON.parse(json);
+    return sanitizeReplayPayload(parsed);
+  } catch (error) {
+    return null;
+  }
+}
+
+function parseReplayFromUrlHash() {
+  if (!window.location.hash || !window.location.hash.startsWith(REPLAY_HASH_PREFIX)) {
+    return null;
+  }
+  const encoded = window.location.hash.slice(REPLAY_HASH_PREFIX.length);
+  if (!encoded) return null;
+  return decodeReplayFromString(encoded);
+}
+
+function exportReplayToFile() {
+  if (!replayLastRun) {
+    renderReplayStatus("No replay available to export.");
+    return;
+  }
+  const payload = JSON.stringify(replayLastRun, null, 2);
+  const blob = new Blob([payload], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `pacman-replay-${Date.now()}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+  renderReplayStatus("Replay exported.");
+}
+
+function copyReplayShareLink() {
+  if (!replayLastRun) {
+    renderReplayStatus("No replay available to share.");
+    return;
+  }
+  const encoded = encodeReplayToString(replayLastRun);
+  if (!encoded) {
+    renderReplayStatus("Could not encode replay.");
+    return;
+  }
+  const shareUrl = `${window.location.origin}${window.location.pathname}${REPLAY_HASH_PREFIX}${encoded}`;
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    navigator.clipboard.writeText(shareUrl)
+      .then(() => renderReplayStatus("Replay link copied to clipboard."))
+      .catch(() => renderReplayStatus("Clipboard unavailable. Copy URL manually from address bar."));
+  } else {
+    renderReplayStatus("Clipboard unavailable. Copy URL manually from address bar.");
+  }
+}
+
+function importReplayPayload(payload) {
+  const sanitized = sanitizeReplayPayload(payload);
+  if (!sanitized || !Array.isArray(sanitized.events)) {
+    renderReplayStatus("Invalid replay payload.");
+    return false;
+  }
+  replayLastRun = sanitized;
+  renderReplayButton();
+  renderReplayStatus(`Replay imported (${sanitized.events.length} inputs).`);
+  return true;
+}
+
+function handleReplayFileSelection(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || "{}"));
+      importReplayPayload(parsed);
+    } catch (error) {
+      renderReplayStatus("Replay file parse failed.");
+    }
+  };
+  reader.readAsText(file);
+}
+
 function recordReplayAction(action) {
   if (!replayCurrentRun || isReplayRunning()) return;
   replayCurrentRun.events.push({
@@ -1758,6 +2365,7 @@ function finalizeReplayCapture(metadata = {}) {
   };
   replayCurrentRun = null;
   renderReplayButton();
+  renderReplayStatus();
 }
 
 function startReplayLastRun() {
@@ -1774,6 +2382,7 @@ function startReplayLastRun() {
   renderSettingsUi();
   startNewGame({ replay: true, seed: replayPlayback.seed, skipCapture: true });
   renderReplayButton();
+  renderReplayStatus(`Replay started (${replayPlayback.events.length} inputs).`);
 }
 
 function applyReplayEventsForFrame() {
@@ -1809,6 +2418,59 @@ function maybeBeginAttractMode() {
   trackAnalyticsEvent("attract_mode_started");
 }
 
+function startDailyChallenge() {
+  const dateKey = getTodayDailyKey();
+  const dailySeed = computeDailySeed(dateKey);
+  settings.challengeMode = CHALLENGE_MODES.CLASSIC;
+  persistSettings();
+  renderSettingsUi();
+  startNewGame({ seed: dailySeed, daily: true });
+  addHudToast(`Daily seed ${dailySeed}`, getCurrentPalette().textMode, 1300);
+  trackAnalyticsEvent("daily_challenge_started", { date: dateKey, seed: dailySeed });
+}
+
+function getCurrentRunDurationMs() {
+  if (!Number.isFinite(runStartedAtMs) || runStartedAtMs <= 0) return 0;
+  return Math.max(0, Date.now() - runStartedAtMs);
+}
+
+function finalizeRunResult(options = {}) {
+  if (runResultCommitted) return;
+  if (!Number.isFinite(runStartedAtMs) || runStartedAtMs <= 0) {
+    runResultCommitted = true;
+    return;
+  }
+  if (attractModeActive || activeRunIsReplay) {
+    runResultCommitted = true;
+    return;
+  }
+
+  const completed = Boolean(options.completed);
+  const dateKey = getTodayDailyKey();
+  const durationMs = getCurrentRunDurationMs();
+  addLeaderboardResult({
+    mode: settings.challengeMode,
+    seed: activeRunSeed,
+    scoreValue: score,
+    durationMs,
+    completed,
+    dateKey,
+  });
+
+  if (activeRunIsDaily) {
+    addDailyHistoryEntry({
+      dateKey,
+      seed: activeRunSeed,
+      scoreValue: score,
+      completed,
+    });
+  }
+
+  renderDailyStatus();
+  renderLeaderboard();
+  runResultCommitted = true;
+}
+
 function startNewGame(options = {}) {
   attractModeActive = Boolean(options.attract);
   if (!attractModeActive) {
@@ -1818,9 +2480,20 @@ function startNewGame(options = {}) {
     replayPlayback = null;
   }
 
+  if (!options.skipFinalizeResult) {
+    finalizeRunResult({ completed: levelsClearedThisRun > 0 });
+  }
+
   const replaySeed = options.seed;
   const requestedSeed = Number.isFinite(replaySeed) ? replaySeed : createRunSeed();
   activeRunSeed = requestedSeed;
+  activeRunIsDaily = Boolean(options.daily);
+  activeRunIsReplay = Boolean(options.replay);
+  runResultCommitted = false;
+  runStartedAtMs = Date.now();
+  levelsClearedThisRun = 0;
+  musicStepIndex = 0;
+  musicLastStepAt = 0;
   setRunRandomSeed(activeRunSeed);
 
   if (!options.skipCapture) {
@@ -1849,7 +2522,9 @@ function startNewGame(options = {}) {
         ? ""
         : `Mode: ${settings.challengeMode.replace("-", " ")}`,
   });
+  renderSeedStatus();
   renderReplayButton();
+  renderDailyStatus();
 }
 
 function startNextLevel() {
@@ -1873,6 +2548,7 @@ function restartCurrentRun() {
 }
 
 function onLevelComplete() {
+  levelsClearedThisRun += 1;
   if (!attractModeActive) {
     syncHighScore();
   }
@@ -1971,6 +2647,16 @@ function getActionForKey(key) {
   if (normalized === "arrowright") return "right";
   if (normalized === "arrowdown") return "down";
 
+  if (settings.oneHandedMode) {
+    if (normalized === "j") return "left";
+    if (normalized === "i") return "up";
+    if (normalized === "l") return "right";
+    if (normalized === "k") return "down";
+    if (normalized === "h") return "pause";
+    if (normalized === "u") return "start";
+    if (normalized === "o") return "restart";
+  }
+
   return null;
 }
 
@@ -2038,6 +2724,7 @@ function handleAction(action, options = {}) {
     return;
   }
   if (action === "start") {
+    triggerHapticFeedback("ui");
     if (phase === GAME_PHASE_START || phase === GAME_PHASE_GAMEOVER) {
       startNewGame();
     } else if (phase === GAME_PHASE_PAUSED) {
@@ -2054,7 +2741,7 @@ function clearSwipeState() {
 }
 
 function onCanvasTouchStart(event) {
-  if (settings.mobileInputMode !== "buttons") return;
+  if (settings.mobileInputMode !== "buttons" || settings.oneHandedMode) return;
   if (!event.touches || event.touches.length === 0) return;
   primeAudioContext();
   swipeStartX = event.touches[0].clientX;
@@ -2062,13 +2749,13 @@ function onCanvasTouchStart(event) {
 }
 
 function onCanvasTouchMove(event) {
-  if (settings.mobileInputMode !== "buttons") return;
+  if (settings.mobileInputMode !== "buttons" || settings.oneHandedMode) return;
   if (swipeStartX === null || swipeStartY === null) return;
   event.preventDefault();
 }
 
 function onCanvasTouchEnd(event) {
-  if (settings.mobileInputMode !== "buttons") return;
+  if (settings.mobileInputMode !== "buttons" || settings.oneHandedMode) return;
   if (swipeStartX === null || swipeStartY === null) return;
   if (!event.changedTouches || event.changedTouches.length === 0) {
     clearSwipeState();
@@ -2092,16 +2779,37 @@ function onCanvasTouchEnd(event) {
   }
 }
 
+function updateMobileControlSizing() {
+  const coarsePointer = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+  const root = document.documentElement;
+  if (!root) return;
+
+  if (!coarsePointer) {
+    root.style.removeProperty("--control-size");
+    root.style.removeProperty("--stick-size");
+    return;
+  }
+
+  const shortEdge = Math.max(300, Math.min(window.innerWidth, window.innerHeight));
+  const controlSize = Math.max(50, Math.min(78, Math.round(shortEdge * 0.16)));
+  const stickSize = Math.max(122, Math.min(170, Math.round(controlSize * 2.15)));
+  root.style.setProperty("--control-size", `${controlSize}px`);
+  root.style.setProperty("--stick-size", `${stickSize}px`);
+}
+
 function updateMobileInputPresentation() {
   const coarsePointer = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+  const forceStick = settings.oneHandedMode;
+  const useStick = settings.mobileInputMode === "stick" || forceStick;
+  updateMobileControlSizing();
 
   if (touchControlsRoot) {
-    const showButtons = coarsePointer && settings.mobileInputMode === "buttons";
+    const showButtons = coarsePointer && !useStick;
     touchControlsRoot.classList.toggle("hidden", !showButtons);
   }
 
   if (virtualStickRoot) {
-    const showStick = coarsePointer && settings.mobileInputMode === "stick";
+    const showStick = coarsePointer && useStick;
     virtualStickRoot.classList.toggle("hidden", !showStick);
   }
 }
@@ -2124,7 +2832,7 @@ function updateDirectionFromVector(dx, dy) {
 }
 
 function onStickPointerDown(event) {
-  if (settings.mobileInputMode !== "stick") return;
+  if (settings.mobileInputMode !== "stick" && !settings.oneHandedMode) return;
   if (!stickBase) return;
 
   primeAudioContext();
@@ -2134,6 +2842,15 @@ function onStickPointerDown(event) {
   const rect = stickBase.getBoundingClientRect();
   stickCenterX = rect.left + rect.width / 2;
   stickCenterY = rect.top + rect.height / 2;
+  const baseDiameter = Math.min(rect.width, rect.height);
+  const knobDiameter = stickKnob
+    ? Math.min(stickKnob.offsetWidth, stickKnob.offsetHeight)
+    : 0;
+  const computedRadius = (baseDiameter - knobDiameter) / 2;
+  stickMaxRadius =
+    Number.isFinite(computedRadius) && computedRadius > 0
+      ? computedRadius
+      : STICK_MAX_RADIUS;
 
   onStickPointerMove(event);
 }
@@ -2145,7 +2862,7 @@ function onStickPointerMove(event) {
   const rawDx = event.clientX - stickCenterX;
   const rawDy = event.clientY - stickCenterY;
   const magnitude = Math.hypot(rawDx, rawDy);
-  const clampScale = magnitude > STICK_MAX_RADIUS ? STICK_MAX_RADIUS / magnitude : 1;
+  const clampScale = magnitude > stickMaxRadius ? stickMaxRadius / magnitude : 1;
   const dx = rawDx * clampScale;
   const dy = rawDy * clampScale;
 
@@ -2163,6 +2880,7 @@ function onStickPointerUp(event) {
     }
   }
   stickPointerId = null;
+  stickMaxRadius = STICK_MAX_RADIUS;
   resetStickKnob();
 }
 
@@ -2188,16 +2906,16 @@ function pollGamepadInput() {
     return current && !previous;
   }
 
-  if (justPressed(9)) {
+  if (justPressed(settings.gamepadMap.start)) {
     handleAction("start");
   }
-  if (justPressed(1)) {
+  if (justPressed(settings.gamepadMap.restart)) {
     handleAction("restart");
   }
-  if (justPressed(2)) {
+  if (justPressed(settings.gamepadMap.mute)) {
     handleAction("mute");
   }
-  if (justPressed(3)) {
+  if (justPressed(settings.gamepadMap.pause)) {
     handleAction("pause");
   }
 
@@ -2323,6 +3041,7 @@ function updatePhaseTransitions() {
       if (!attractModeActive) {
         syncHighScore();
       }
+      finalizeRunResult({ completed: levelsClearedThisRun > 0 });
       finalizeReplayCapture({ reason: "game-over" });
       replayPlayback = null;
       renderReplayButton();
@@ -2406,12 +3125,23 @@ function updateGameplay() {
 }
 
 function update() {
+  const stepDebugEnabled = settings.simDebugEnabled;
+  const stepDebugPaused = stepDebugEnabled && settings.simPaused;
+  if (stepDebugPaused && simStepRequests <= 0) {
+    return;
+  }
+  if (stepDebugPaused && simStepRequests > 0) {
+    simStepRequests -= 1;
+  }
+
   simulationFrame += 1;
   maybeBeginAttractMode();
   applyReplayEventsForFrame();
   pollGamepadInput();
   updatePhaseTransitions();
   updatePopups();
+  updateBackgroundMusic();
+  applyAudioSettings();
 
   if (phase === GAME_PHASE_PLAYING && settings.challengeMode === CHALLENGE_MODES.TIME_ATTACK) {
     challengeTimeRemainingMs = Math.max(0, challengeTimeRemainingMs - FRAME_STEP_MS);
@@ -2424,6 +3154,10 @@ function update() {
 
   if (phase === GAME_PHASE_PLAYING) {
     updateGameplay();
+  }
+
+  if (stepDebugEnabled && simulationFrame % 8 === 0) {
+    renderSimDebugStatus();
   }
 }
 
@@ -2626,6 +3360,12 @@ function drawScoreHud() {
     canvasContext.fillStyle = palette.textMode;
     canvasContext.fillText("REPLAY", 690, hudY2);
   }
+
+  if (settings.simDebugEnabled) {
+    canvasContext.fillStyle = palette.textAccent;
+    canvasContext.fillText(`Seed: ${activeRunSeed}`, 560, hudY2 + oneBlockSize * 0.8);
+    canvasContext.fillText(`Frame: ${simulationFrame}`, 760, hudY2 + oneBlockSize * 0.8);
+  }
 }
 
 function drawPointPopups() {
@@ -2799,7 +3539,7 @@ function gameLoop(now) {
 function wireUiEvents() {
   for (let i = 0; i < touchButtons.length; i++) {
     touchButtons[i].addEventListener("pointerdown", (event) => {
-      if (settings.mobileInputMode !== "buttons") return;
+      if (settings.mobileInputMode !== "buttons" || settings.oneHandedMode) return;
       event.preventDefault();
       primeAudioContext();
       const directionName = event.currentTarget.dataset.direction;
@@ -2844,10 +3584,46 @@ function wireUiEvents() {
     });
   }
 
+  if (dailyChallengeButton) {
+    dailyChallengeButton.addEventListener("click", () => {
+      primeAudioContext();
+      noteUserIntent();
+      startDailyChallenge();
+    });
+  }
+
   if (muteToggleButton) {
     muteToggleButton.addEventListener("click", () => {
       primeAudioContext();
       handleAction("mute");
+    });
+  }
+
+  if (replayExportButton) {
+    replayExportButton.addEventListener("click", () => {
+      exportReplayToFile();
+    });
+  }
+
+  if (replayShareButton) {
+    replayShareButton.addEventListener("click", () => {
+      copyReplayShareLink();
+    });
+  }
+
+  if (replayImportButton) {
+    replayImportButton.addEventListener("click", () => {
+      if (replayFileInput) {
+        replayFileInput.click();
+      }
+    });
+  }
+
+  if (replayFileInput) {
+    replayFileInput.addEventListener("change", (event) => {
+      const file = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+      handleReplayFileSelection(file);
+      event.target.value = "";
     });
   }
 
@@ -2877,6 +3653,38 @@ function wireUiEvents() {
     volumeControl.addEventListener("input", (event) => {
       settings.volume = Number(event.target.value);
       applyAudioSettings();
+      persistSettings();
+    });
+  }
+
+  if (sfxVolumeControl) {
+    sfxVolumeControl.addEventListener("input", (event) => {
+      settings.sfxVolume = Number(event.target.value);
+      applyAudioSettings();
+      persistSettings();
+    });
+  }
+
+  if (musicVolumeControl) {
+    musicVolumeControl.addEventListener("input", (event) => {
+      settings.musicVolume = Number(event.target.value);
+      applyAudioSettings();
+      persistSettings();
+    });
+  }
+
+  if (musicEnabledToggle) {
+    musicEnabledToggle.addEventListener("change", (event) => {
+      settings.musicEnabled = Boolean(event.target.checked);
+      applyAudioSettings();
+      persistSettings();
+      renderSettingsUi();
+    });
+  }
+
+  if (hapticsEnabledToggle) {
+    hapticsEnabledToggle.addEventListener("change", (event) => {
+      settings.hapticsEnabled = Boolean(event.target.checked);
       persistSettings();
     });
   }
@@ -2927,6 +3735,75 @@ function wireUiEvents() {
       settings.largeHud = Boolean(event.target.checked);
       persistSettings();
       applyAccessibilitySettings();
+    });
+  }
+
+  if (oneHandedModeToggle) {
+    oneHandedModeToggle.addEventListener("change", (event) => {
+      settings.oneHandedMode = Boolean(event.target.checked);
+      persistSettings();
+      updateMobileInputPresentation();
+      applyAccessibilitySettings();
+      resizeCanvasToFitViewport();
+    });
+  }
+
+  if (runSeedInput) {
+    runSeedInput.addEventListener("change", () => {
+      renderSeedStatus();
+    });
+  }
+
+  if (applySeedButton) {
+    applySeedButton.addEventListener("click", () => {
+      noteUserIntent();
+      applyRunSeedFromInput();
+    });
+  }
+
+  if (copySeedButton) {
+    copySeedButton.addEventListener("click", () => {
+      copyCurrentSeed();
+    });
+  }
+
+  if (simDebugEnabledToggle) {
+    simDebugEnabledToggle.addEventListener("change", (event) => {
+      settings.simDebugEnabled = Boolean(event.target.checked);
+      if (!settings.simDebugEnabled) {
+        settings.simPaused = false;
+        simStepRequests = 0;
+      }
+      persistSettings();
+      renderSimDebugStatus();
+    });
+  }
+
+  if (simPauseButton) {
+    simPauseButton.addEventListener("click", () => {
+      if (!settings.simDebugEnabled) return;
+      setSimulationPaused(!settings.simPaused);
+    });
+  }
+
+  if (simStepButton) {
+    simStepButton.addEventListener("click", () => {
+      requestSimulationStep();
+    });
+  }
+
+  const gamepadMappingInputs = [
+    gamepadStartInput,
+    gamepadPauseInput,
+    gamepadRestartInput,
+    gamepadMuteInput,
+  ];
+  for (let i = 0; i < gamepadMappingInputs.length; i++) {
+    const input = gamepadMappingInputs[i];
+    if (!input) continue;
+    input.addEventListener("change", () => {
+      applyGamepadMapFromInputs();
+      renderSettingsUi();
     });
   }
 
@@ -2987,6 +3864,13 @@ function wireUiEvents() {
     noteUserIntent();
   }, { passive: true });
 
+  window.addEventListener("hashchange", () => {
+    const replayFromHash = parseReplayFromUrlHash();
+    if (replayFromHash) {
+      importReplayPayload(replayFromHash);
+    }
+  });
+
   window.addEventListener("beforeunload", () => {
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
@@ -2999,8 +3883,16 @@ function wireUiEvents() {
 function boot() {
   activeRunSeed = createRunSeed();
   setRunRandomSeed(activeRunSeed);
+  runStartedAtMs = 0;
+  runResultCommitted = true;
   highScore = readHighScoreFromStorage();
   syncHighScore();
+
+  const replayFromHash = parseReplayFromUrlHash();
+  if (replayFromHash) {
+    replayLastRun = replayFromHash;
+    renderReplayStatus(`Replay loaded from URL (${replayFromHash.events.length} inputs).`);
+  }
 
   arcadeViewEnabled = loadArcadeViewPreference() && canUseArcadeView();
   document.body.classList.toggle("arcade-view", arcadeViewEnabled);
