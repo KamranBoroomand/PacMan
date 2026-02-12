@@ -58,6 +58,9 @@ test("game.js keeps arcade AI, level progression, and phase states", () => {
   assert.match(gameJs, /setSimulationPaused/);
   assert.match(gameJs, /createReplayCodec/);
   assert.match(gameJs, /createFramePacingMonitor/);
+  assert.match(gameJs, /function applyChallengeModeSetting/);
+  assert.match(gameJs, /skipFinalizeResult:\s*true/);
+  assert.match(gameJs, /Mode applied:/);
   assert.match(gameJs, /requestAnimationFrame\(gameLoop\)/);
 });
 

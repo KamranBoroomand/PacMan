@@ -1148,12 +1148,36 @@ function renderReplayStatus(message) {
   }
 }
 
-function renderSeedStatus(message) {
-  if (runSeedInput) {
+function renderSeedStatus(message, options = {}) {
+  const shouldSyncInput = options.syncInput !== false;
+  if (runSeedInput && shouldSyncInput) {
     runSeedInput.value = String(activeRunSeed);
   }
   if (!seedStatus) return;
   seedStatus.textContent = message || `Active seed: ${activeRunSeed}`;
+}
+
+function previewRunSeedStatus() {
+  if (!runSeedInput) return;
+  const raw = runSeedInput.value.trim();
+  if (!raw) {
+    renderSeedStatus(undefined, { syncInput: false });
+    return;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    renderSeedStatus("Seed must be a positive integer.", { syncInput: false });
+    return;
+  }
+
+  const normalized = hashSeed(parsed);
+  if (normalized === activeRunSeed) {
+    renderSeedStatus(undefined, { syncInput: false });
+    return;
+  }
+
+  renderSeedStatus(`Pending seed: ${normalized} (apply to restart).`, { syncInput: false });
 }
 
 function getFramePacingStatusText() {
@@ -1395,12 +1419,12 @@ function applyGamepadMapFromInputs() {
 
 function applyRunSeedFromInput() {
   if (!runSeedInput) return;
-  const parsed = Number.parseInt(runSeedInput.value, 10);
+  const parsed = Number.parseInt(runSeedInput.value.trim(), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    renderSeedStatus("Seed must be a positive integer.");
+    renderSeedStatus("Seed must be a positive integer.", { syncInput: false });
     return;
   }
-  startNewGame({ seed: parsed });
+  startNewGame({ seed: hashSeed(parsed) });
   renderSeedStatus(`Applied seed: ${activeRunSeed}`);
 }
 
@@ -2713,8 +2737,42 @@ function startNextLevel() {
 }
 
 function restartCurrentRun() {
-  startNewGame();
+  const keepDailyRun = activeRunIsDaily && settings.challengeMode === CHALLENGE_MODES.CLASSIC;
+  startNewGame({ seed: activeRunSeed, daily: keepDailyRun });
   playGameSfx("ui");
+}
+
+function shouldHotApplyChallengeMode() {
+  if (isReplayRunning() || attractModeActive) return false;
+  return (
+    phase === GAME_PHASE_READY ||
+    phase === GAME_PHASE_PLAYING ||
+    phase === GAME_PHASE_PAUSED ||
+    phase === GAME_PHASE_DYING ||
+    phase === GAME_PHASE_INTERMISSION ||
+    phase === GAME_PHASE_CUTSCENE
+  );
+}
+
+function applyChallengeModeSetting(nextMode) {
+  settings.challengeMode = Object.values(CHALLENGE_MODES).includes(nextMode)
+    ? nextMode
+    : CHALLENGE_MODES.CLASSIC;
+  persistSettings();
+  renderSettingsUi();
+
+  if (shouldHotApplyChallengeMode()) {
+    const keepDailyRun = activeRunIsDaily && settings.challengeMode === CHALLENGE_MODES.CLASSIC;
+    startNewGame({
+      seed: activeRunSeed,
+      daily: keepDailyRun,
+      skipFinalizeResult: true,
+    });
+    addHudToast(`Mode applied: ${settings.challengeMode}`, getCurrentPalette().textMode, 1200);
+    return;
+  }
+
+  addHudToast(`Mode: ${settings.challengeMode}`, getCurrentPalette().textMode, 1100);
 }
 
 function onLevelComplete() {
@@ -3885,13 +3943,7 @@ function wireUiEvents() {
 
   if (challengeModeSelect) {
     challengeModeSelect.addEventListener("change", (event) => {
-      const nextMode = event.target.value;
-      settings.challengeMode = Object.values(CHALLENGE_MODES).includes(nextMode)
-        ? nextMode
-        : CHALLENGE_MODES.CLASSIC;
-      persistSettings();
-      renderSettingsUi();
-      addHudToast(`Mode: ${settings.challengeMode}`, getCurrentPalette().textMode, 1100);
+      applyChallengeModeSetting(event.target.value);
     });
   }
 
@@ -3933,8 +3985,17 @@ function wireUiEvents() {
   }
 
   if (runSeedInput) {
+    runSeedInput.addEventListener("input", () => {
+      previewRunSeedStatus();
+    });
     runSeedInput.addEventListener("change", () => {
-      renderSeedStatus();
+      previewRunSeedStatus();
+    });
+    runSeedInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      noteUserIntent();
+      applyRunSeedFromInput();
     });
   }
 

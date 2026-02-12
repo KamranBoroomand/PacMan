@@ -67,3 +67,20 @@ test("daily and deterministic debug controls are accessible", async ({ page }) =
   await expect(page.locator("#sim-debug-enabled")).toBeVisible();
   await expect(page.locator("#replay-export")).toBeVisible();
 });
+
+test("seed apply works and restart keeps the active seed", async ({ page }) => {
+  await page.goto("/");
+  await page.getByText("Settings", { exact: true }).click();
+
+  const seedInput = page.locator("#run-seed-input");
+  const seedStatus = page.locator("#seed-status");
+
+  await seedInput.fill("777");
+  await expect(seedStatus).toContainText("Pending seed: 777");
+
+  await page.locator("#apply-seed").click();
+  await expect(seedStatus).toContainText("Applied seed: 777");
+
+  await page.locator("#restart-game").click();
+  await expect(seedStatus).toContainText("Active seed: 777");
+});
