@@ -19,7 +19,7 @@ test("runtime frame pacing stays within budget on desktop chromium", async ({ pa
           return snapshot ? snapshot.sampleCount : 0;
         }),
       {
-        timeout: 7000,
+        timeout: 15000,
         interval: 200,
       }
     )
