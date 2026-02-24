@@ -7,6 +7,11 @@ test("runtime frame pacing stays within budget on desktop chromium", async ({ pa
   await page.goto("/");
   await page.locator("#start-game").click();
 
+  // Warm up first-load compilation/path setup, then reset pacing stats via restart
+  // so the budget assertion evaluates steady-state runtime behavior.
+  await page.waitForTimeout(2500);
+  await page.locator("#restart-game").click();
+
   await expect
     .poll(
       async () =>
