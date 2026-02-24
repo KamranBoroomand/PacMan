@@ -50,6 +50,7 @@ class Ghost {
         );
         this.directionTimer = null;
         this.frightenedTurnsRemaining = 0;
+        this.debugIntent = null;
     }
 
     dispose() {
@@ -214,6 +215,7 @@ class Ghost {
     moveProcess() {
         this.maybeReleaseFromHouse();
         if (this.isInHouse()) {
+            this.debugIntent = null;
             return;
         }
 
@@ -562,31 +564,12 @@ class Ghost {
         return available;
     }
 
-    pickRandomDirection(candidates) {
+    buildDirectionalCandidates(candidates, originTile, currentMap) {
         if (!Array.isArray(candidates) || candidates.length === 0) {
-            return this.direction;
+            return [];
         }
 
-        if (candidates.length === 1) {
-            return candidates[0];
-        }
-
-        const randomFn = typeof randomFloat === "function" ? randomFloat : Math.random;
-        const index = Math.floor(randomFn() * candidates.length);
-        return candidates[index];
-    }
-
-    pickDirectionClosestToTarget(candidates, originTile, targetTile, currentMap) {
-        if (!Array.isArray(candidates) || candidates.length === 0) {
-            return this.direction;
-        }
-
-        const utils =
-            typeof GameplayUtils === "object" && GameplayUtils
-                ? GameplayUtils
-                : null;
         const directionalCandidates = [];
-
         for (let i = 0; i < candidates.length; i++) {
             const direction = candidates[i];
             const neighbor = this.getNeighborTile(
@@ -604,14 +587,85 @@ class Ghost {
             });
         }
 
+        return directionalCandidates;
+    }
+
+    setDebugIntent(options = {}) {
+        const originTile = options.originTile || null;
+        const targetTile = options.targetTile || null;
+        const availableDirections = Array.isArray(options.availableDirections)
+            ? options.availableDirections.slice()
+            : [];
+        const candidateTiles = Array.isArray(options.candidateTiles)
+            ? options.candidateTiles.map((candidate) => ({
+                direction: candidate.direction,
+                x: candidate.x,
+                y: candidate.y,
+            }))
+            : [];
+        const chosenDirection = Number.isFinite(options.chosenDirection)
+            ? options.chosenDirection
+            : this.direction;
+        const chosenTile =
+            candidateTiles.find((candidate) => candidate.direction === chosenDirection) || null;
+
+        this.debugIntent = {
+            originTile: originTile
+                ? { x: originTile.x, y: originTile.y }
+                : null,
+            targetTile: targetTile
+                ? { x: targetTile.x, y: targetTile.y }
+                : null,
+            availableDirections,
+            candidates: candidateTiles,
+            chosenDirection,
+            chosenTile: chosenTile ? { x: chosenTile.x, y: chosenTile.y } : null,
+            reason: options.reason || "target",
+            mode: this.isEaten() ? "eaten" : (this.isFrightened() ? "frightened" : "normal"),
+        };
+    }
+
+    pickRandomDirection(candidates) {
+        if (!Array.isArray(candidates) || candidates.length === 0) {
+            return this.direction;
+        }
+
+        if (candidates.length === 1) {
+            return candidates[0];
+        }
+
+        const randomFn = typeof randomFloat === "function" ? randomFloat : Math.random;
+        const index = Math.floor(randomFn() * candidates.length);
+        return candidates[index];
+    }
+
+    pickDirectionClosestToTarget(
+        candidates,
+        originTile,
+        targetTile,
+        currentMap,
+        directionalCandidates = null
+    ) {
+        if (!Array.isArray(candidates) || candidates.length === 0) {
+            return this.direction;
+        }
+
+        const utils =
+            typeof GameplayUtils === "object" && GameplayUtils
+                ? GameplayUtils
+                : null;
+        const normalizedDirectionalCandidates = Array.isArray(directionalCandidates)
+            ? directionalCandidates
+            : this.buildDirectionalCandidates(candidates, originTile, currentMap);
+
         if (
             utils &&
             typeof utils.pickGhostDirection === "function" &&
-            directionalCandidates.length > 0
+            normalizedDirectionalCandidates.length > 0
         ) {
             const mode = this.isEaten() ? "eaten" : (this.isFrightened() ? "frightened" : "normal");
             const pickedDirection = utils.pickGhostDirection({
-                candidates: directionalCandidates,
+                candidates: normalizedDirectionalCandidates,
                 targetTile,
                 currentDirection: this.direction,
                 personality: this.personality,
@@ -670,6 +724,14 @@ class Ghost {
         );
 
         if (availableDirections.length === 0) {
+            this.setDebugIntent({
+                originTile,
+                targetTile,
+                availableDirections,
+                candidateTiles: [],
+                chosenDirection: this.direction,
+                reason: "no-path",
+            });
             return this.direction;
         }
 
@@ -684,10 +746,23 @@ class Ghost {
                 candidates = nonReverse;
             }
         }
+        const directionalCandidates = this.buildDirectionalCandidates(
+            candidates,
+            originTile,
+            currentMap
+        );
 
         if (this.isFrightened() && !this.isEaten()) {
             const canContinue = candidates.includes(this.direction);
             if (this.frightenedTurnsRemaining <= 0 && canContinue) {
+                this.setDebugIntent({
+                    originTile,
+                    targetTile,
+                    availableDirections,
+                    candidateTiles: directionalCandidates,
+                    chosenDirection: this.direction,
+                    reason: "frightened-hold",
+                });
                 return this.direction;
             }
 
@@ -699,15 +774,33 @@ class Ghost {
                     this.frightenedTurnsRemaining - 1
                 );
             }
+            this.setDebugIntent({
+                originTile,
+                targetTile,
+                availableDirections,
+                candidateTiles: directionalCandidates,
+                chosenDirection: picked,
+                reason: "frightened-random",
+            });
             return picked;
         }
 
-        return this.pickDirectionClosestToTarget(
+        const pickedDirection = this.pickDirectionClosestToTarget(
             candidates,
             originTile,
             targetTile,
-            currentMap
+            currentMap,
+            directionalCandidates
         );
+        this.setDebugIntent({
+            originTile,
+            targetTile,
+            availableDirections,
+            candidateTiles: directionalCandidates,
+            chosenDirection: pickedDirection,
+            reason: "target-closest",
+        });
+        return pickedDirection;
     }
 
     getMapX() {

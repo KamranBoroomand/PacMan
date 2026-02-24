@@ -25,7 +25,12 @@ test("index.html exposes upgraded controls and settings", () => {
   assert.match(indexHtml, /id="palette-mode"/);
   assert.match(indexHtml, /id="run-seed-input"/);
   assert.match(indexHtml, /id="sim-debug-enabled"/);
+  assert.match(indexHtml, /id="ghost-debug-overlay"/);
   assert.match(indexHtml, /id="replay-export"/);
+  assert.match(indexHtml, /id="settings-export"/);
+  assert.match(indexHtml, /id="settings-import"/);
+  assert.match(indexHtml, /id="settings-transfer-status"/);
+  assert.match(indexHtml, /id="a11y-live-region"/);
   assert.match(indexHtml, /id="leaderboard-output"/);
   assert.match(indexHtml, /class="keybind-btn"/);
   assert.match(indexHtml, /id="virtual-stick"/);
@@ -107,6 +112,8 @@ test("release and quality workflows are present", () => {
   const releaseWorkflow = read(".github/workflows/release.yml");
   const visualWorkflow = read(".github/workflows/visual-regression.yml");
   const flakyWorkflow = read(".github/workflows/flaky-quarantine.yml");
+  const deployWorkflow = read(".github/workflows/deploy-stable-site.yml");
+  const lighthouseBudget = read("lighthouse-budget.json");
 
   assert.match(qualityWorkflow, /Quality Checks/);
   assert.match(qualityWorkflow, /test:e2e/);
@@ -122,4 +129,8 @@ test("release and quality workflows are present", () => {
   assert.match(flakyWorkflow, /Flaky Quarantine/);
   assert.match(flakyWorkflow, /npx playwright test/);
   assert.match(flakyWorkflow, /continue-on-error: true/);
+  assert.match(deployWorkflow, /Deploy Stable Site/);
+  assert.match(deployWorkflow, /actions\/deploy-pages/);
+  assert.match(qualityWorkflow, /run_lighthouse/);
+  assert.match(lighthouseBudget, /largest-contentful-paint/);
 });

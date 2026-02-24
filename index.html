@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <div id="a11y-live-region" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <div class="bg-layer bg-pixel" aria-hidden="true"></div>
   <div class="bg-layer bg-stars" aria-hidden="true"></div>
   <div class="bg-layer bg-flow" aria-hidden="true"></div>
@@ -154,6 +155,11 @@
           <input id="one-handed-mode" type="checkbox" />
         </label>
 
+        <label class="settings-item settings-toggle" for="ghost-debug-overlay">
+          <span>Ghost Debug Overlay</span>
+          <input id="ghost-debug-overlay" type="checkbox" />
+        </label>
+
         <div class="settings-item seed-tools" aria-label="Seed tools">
           <span>Run Seed</span>
           <input id="run-seed-input" type="number" min="1" max="2147483646" step="1" value="123456789" />
@@ -187,6 +193,16 @@
           </div>
           <input id="replay-file-input" type="file" accept="application/json" class="hidden" />
           <p class="settings-help" id="replay-status">No replay imported.</p>
+        </div>
+
+        <div class="settings-item settings-transfer" aria-label="Settings transfer">
+          <span>Settings Transfer</span>
+          <div class="action-inline">
+            <button id="settings-export" class="action-btn compact" type="button">Export Settings</button>
+            <button id="settings-import" class="action-btn compact" type="button">Import Settings</button>
+          </div>
+          <input id="settings-file-input" type="file" accept="application/json" class="hidden" />
+          <p class="settings-help" id="settings-transfer-status">No settings imported.</p>
         </div>
 
         <div class="settings-item gamepad-binds" aria-label="Gamepad remap">

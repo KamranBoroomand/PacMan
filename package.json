@@ -10,12 +10,14 @@
     "test:e2e": "playwright test",
     "test:e2e:chromium": "playwright test --project=desktop-chromium",
     "test:e2e:mobile": "playwright test --project=mobile-chromium",
+    "test:e2e:perf": "playwright test tests/e2e/performance.spec.js --project=desktop-chromium",
     "test:e2e:visual": "PLAYWRIGHT_VISUAL=1 playwright test",
+    "test:lighthouse": "node scripts/lighthouse-baseline.js",
     "check": "npm run lint && npm run test:unit",
     "check:all": "npm run check && npm run test:e2e"
   },
   "devDependencies": {
-    "@playwright/test": "^1.51.0"
+    "@playwright/test": "1.51.0"
   },
   "engines": {
     "node": ">=20"

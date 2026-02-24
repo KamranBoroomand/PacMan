@@ -9,6 +9,11 @@ on:
         required: false
         type: boolean
         default: false
+      run_lighthouse:
+        description: "Run optional Lighthouse baseline budget"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   quality:
@@ -23,9 +28,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox webkit
@@ -39,6 +45,38 @@ jobs:
       - name: Visual snapshot tests
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_visual }}
         run: PLAYWRIGHT_VISUAL=1 npm run test:e2e -- --project=desktop-chromium
+
+  lighthouse:
+    name: Optional Lighthouse Baseline
+    runs-on: ubuntu-latest
+    needs: quality
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_lighthouse }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start static server
+        run: |
+          python3 -m http.server 4173 > /tmp/lighthouse-server.log 2>&1 &
+          echo $! > /tmp/lighthouse-server.pid
+          sleep 2
+
+      - name: Lighthouse budget check
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            http://127.0.0.1:4173/
+          budgetPath: ./lighthouse-budget.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Stop static server
+        if: always()
+        run: |
+          if [ -f /tmp/lighthouse-server.pid ]; then
+            kill "$(cat /tmp/lighthouse-server.pid)" || true
+          fi
 
   site-artifact:
     name: Build Site Artifact

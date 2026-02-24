@@ -1,4 +1,7 @@
 (function initReplayTools(globalScope) {
+  const REPLAY_SCHEMA_VERSION = 2;
+  const LEGACY_SCHEMA_VERSION = 1;
+
   function safeNow(nowFn) {
     if (typeof nowFn === "function") {
       const value = Number(nowFn());
@@ -43,8 +46,104 @@
     return fallbackMode;
   }
 
-  function sanitizeReplayPayload(payload, options = {}) {
+  function toSafeInteger(value, fallback = 0) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function normalizeReplayEvent(entry) {
+    let frame = null;
+    let action = null;
+
+    if (Array.isArray(entry) && entry.length >= 2) {
+      frame = entry[0];
+      action = entry[1];
+    } else if (entry && typeof entry === "object") {
+      frame =
+        entry.frame ??
+        entry.tick ??
+        entry.t ??
+        entry.atFrame ??
+        entry.whenFrame ??
+        null;
+      action =
+        entry.action ??
+        entry.input ??
+        entry.key ??
+        entry.command ??
+        null;
+    }
+
+    const normalizedFrame = Math.max(0, Math.floor(Number(frame)));
+    if (!Number.isFinite(normalizedFrame)) return null;
+    if (typeof action !== "string") return null;
+
+    const normalizedAction = action.trim().toLowerCase();
+    if (!normalizedAction) return null;
+
+    return {
+      frame: normalizedFrame,
+      action: normalizedAction,
+    };
+  }
+
+  function normalizeReplayEvents(events) {
+    if (!Array.isArray(events)) return [];
+    return events
+      .map((entry) => normalizeReplayEvent(entry))
+      .filter(Boolean)
+      .sort((a, b) => a.frame - b.frame);
+  }
+
+  function migrateReplayPayload(payload) {
     if (!payload || typeof payload !== "object") return null;
+
+    const sourceSchemaVersion = Math.max(
+      LEGACY_SCHEMA_VERSION,
+      toSafeInteger(
+        payload.schemaVersion ?? payload.replaySchemaVersion ?? payload.version,
+        LEGACY_SCHEMA_VERSION
+      )
+    );
+
+    if (sourceSchemaVersion > REPLAY_SCHEMA_VERSION) {
+      return null;
+    }
+
+    if (sourceSchemaVersion >= REPLAY_SCHEMA_VERSION) {
+      return {
+        sourceSchemaVersion,
+        migratedPayload: {
+          ...payload,
+          schemaVersion: REPLAY_SCHEMA_VERSION,
+        },
+      };
+    }
+
+    const migratedPayload = {
+      schemaVersion: REPLAY_SCHEMA_VERSION,
+      seed: payload.seed ?? payload.runSeed,
+      challengeMode: payload.challengeMode ?? payload.mode ?? payload.challenge,
+      events: payload.events ?? payload.inputs ?? payload.actions ?? [],
+      startedAt: payload.startedAt ?? payload.startTime,
+      endedAt: payload.endedAt ?? payload.endTime,
+      score: payload.score ?? payload.finalScore ?? payload.points,
+      level: payload.level ?? payload.finalLevel ?? payload.stage,
+      reason: payload.reason,
+      exportedAt: payload.exportedAt,
+    };
+
+    return {
+      sourceSchemaVersion,
+      migratedPayload,
+    };
+  }
+
+  function sanitizeReplayPayload(payload, options = {}) {
+    const migrationResult = migrateReplayPayload(payload);
+    if (!migrationResult || !migrationResult.migratedPayload) return null;
+
+    const migratedPayload = migrationResult.migratedPayload;
 
     const hashSeed =
       typeof options.hashSeed === "function"
@@ -54,39 +153,46 @@
     const fallbackMode =
       options.defaultChallengeMode || Object.values(challengeModes)[0] || "classic";
 
-    const seed = hashSeed(payload.seed);
+    const seed = hashSeed(migratedPayload.seed);
     const challengeMode = normalizeChallengeMode(
-      payload.challengeMode,
+      migratedPayload.challengeMode,
       challengeModes,
       fallbackMode
     );
-    const events = Array.isArray(payload.events)
-      ? payload.events
-          .filter(
-            (entry) =>
-              entry &&
-              Number.isFinite(Number(entry.frame)) &&
-              typeof entry.action === "string"
-          )
-          .map((entry) => ({
-            frame: Math.max(0, Math.floor(Number(entry.frame))),
-            action: entry.action,
-          }))
-      : [];
+    const events = normalizeReplayEvents(migratedPayload.events);
 
-    return {
+    const sanitized = {
+      schemaVersion: REPLAY_SCHEMA_VERSION,
       seed,
       challengeMode,
       events,
-      startedAt: Number.isFinite(Number(payload.startedAt))
-        ? Number(payload.startedAt)
+      startedAt: Number.isFinite(Number(migratedPayload.startedAt))
+        ? Number(migratedPayload.startedAt)
         : safeNow(options.nowMs),
-      endedAt: Number.isFinite(Number(payload.endedAt))
-        ? Number(payload.endedAt)
+      endedAt: Number.isFinite(Number(migratedPayload.endedAt))
+        ? Number(migratedPayload.endedAt)
         : safeNow(options.nowMs),
-      score: Number.isFinite(Number(payload.score)) ? Number(payload.score) : 0,
-      level: Number.isFinite(Number(payload.level)) ? Number(payload.level) : 1,
+      score: Number.isFinite(Number(migratedPayload.score))
+        ? Number(migratedPayload.score)
+        : 0,
+      level: Number.isFinite(Number(migratedPayload.level))
+        ? Number(migratedPayload.level)
+        : 1,
     };
+
+    if (typeof migratedPayload.reason === "string" && migratedPayload.reason.length > 0) {
+      sanitized.reason = migratedPayload.reason;
+    }
+
+    if (Number.isFinite(Number(migratedPayload.exportedAt))) {
+      sanitized.exportedAt = Number(migratedPayload.exportedAt);
+    }
+
+    if (migrationResult.sourceSchemaVersion < REPLAY_SCHEMA_VERSION) {
+      sanitized.migratedFromVersion = migrationResult.sourceSchemaVersion;
+    }
+
+    return sanitized;
   }
 
   function encodeReplayToString(replayData) {
@@ -123,6 +229,9 @@
       sanitize(payload) {
         return sanitizeReplayPayload(payload, options);
       },
+      schemaVersion() {
+        return REPLAY_SCHEMA_VERSION;
+      },
       encode(replayData) {
         return encodeReplayToString(replayData);
       },
@@ -136,11 +245,15 @@
   }
 
   const api = {
+    REPLAY_SCHEMA_VERSION,
     createReplayCodec,
     decodeReplayFromString,
     encodeReplayToString,
+    migrateReplayPayload,
+    normalizeReplayEvents,
     parseReplayFromHash,
     sanitizeReplayPayload,
+    toSafeInteger,
   };
 
   if (typeof module !== "undefined" && module.exports) {

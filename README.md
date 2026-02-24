@@ -40,10 +40,14 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - Configurable settings panel with:
   - Volume control, mute, key rebinding, challenge mode select, and mobile input mode selection.
   - Accessibility controls: color-blind/high-contrast palette, reduced motion, and large HUD text.
+  - Assistive updates via a lightweight live region for phase/score/life announcements.
+  - Settings import/export JSON for moving control/accessibility presets across devices.
+  - Optional ghost debug overlay showing target tile and path intent.
   - Persistent settings via `localStorage`.
 - Replay system:
   - Deterministic run seed + per-frame action capture.
   - Replay button to rerun the last completed attempt.
+  - Versioned replay schema with migration support for older payloads.
   - Export/import replay JSON plus shareable URL hash links.
 - Deterministic simulation debugger:
   - Seed inspector with apply/copy controls.
@@ -61,6 +65,8 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
   - `requestAnimationFrame` game loop targeting smooth 60 FPS.
   - Cached wall tiles and reduced per-frame overhead in hot paths.
   - Frame-pacing guardrails with stutter detection and analytics hooks.
+  - Frame-time budget regression coverage in Playwright (`tests/e2e/performance.spec.js`).
+  - Optional Lighthouse baseline budget checks for the landing shell.
 - Audio polish:
   - Per-channel mixer controls (master/SFX/music), looped synth bed, and SFX-driven ducking.
 - PWA support:
@@ -72,6 +78,7 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
   - Optional visual snapshot Playwright specs.
   - Visual regression lane + flaky-test quarantine workflow.
   - Deployable site artifact workflow.
+  - Stable-tag (`v*`) static deployment workflow for GitHub Pages.
   - Manual release tagging with semantic-version validation, alpha/stable channels, categorized changelog, and rollback guide.
 
 ## Tech Stack
@@ -99,6 +106,9 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - `.github/workflows/ci.yml`: Lint + unit tests on push/PR.
 - `.github/workflows/quality-checks.yml`: Lint/unit/e2e checks + upload site artifact.
 - `.github/workflows/release.yml`: Manual tag + changelog + GitHub release workflow.
+- `.github/workflows/deploy-stable-site.yml`: Automatic static deployment for stable release tags.
+- `lighthouse-budget.json`: Optional landing-shell Lighthouse budget baseline.
+- `scripts/lighthouse-baseline.js`: Optional local Lighthouse runner (`LIGHTHOUSE_RUN=1`).
 
 ### Runtime Flow
 1. `game.js` initializes map state, actors, level tuning, replay seed, and UI handlers.
@@ -132,9 +142,11 @@ Then open `http://localhost:8080`.
 
 ### Option C: Contributor Setup (tests/tooling)
 ```bash
-npm install
+npm ci
 npx playwright install chromium firefox webkit
 ```
+
+Use lockfile-driven installs (`npm ci`) for deterministic environments. If dependencies change, regenerate and commit `package-lock.json`.
 
 ## Configuration
 Primary gameplay/config constants live in `scripts/game.js`.
@@ -164,10 +176,13 @@ npm test
 npm run test:e2e
 npm run test:e2e:chromium
 npm run test:e2e:mobile
+npm run test:e2e:perf
 npm run test:e2e:visual
+npm run test:lighthouse
 npm run check
 npm run check:all
 PLAYWRIGHT_VISUAL=1 npm run test:e2e
+LIGHTHOUSE_RUN=1 npm run test:lighthouse
 ```
 
 - `npm run lint`: Syntax + structural lint checks (`scripts/lint.js`).
@@ -175,7 +190,9 @@ PLAYWRIGHT_VISUAL=1 npm run test:e2e
 - `npm run test:e2e`: Browser end-to-end tests with Playwright (`tests/e2e/*.spec.js`).
 - `npm run test:e2e:chromium`: Desktop Chromium-only e2e lane.
 - `npm run test:e2e:mobile`: Mobile Chromium viewport/profile e2e lane.
+- `npm run test:e2e:perf`: Frame-time budget regression lane (Chromium desktop profile).
 - `npm run test:e2e:visual`: Runs Playwright with `PLAYWRIGHT_VISUAL=1` for snapshot checks.
+- `npm run test:lighthouse`: Optional Lighthouse baseline runner (requires `LIGHTHOUSE_RUN=1`).
 - `PLAYWRIGHT_VISUAL=1 npm run test:e2e`: Enables visual snapshot assertions in `tests/e2e/visual.spec.js`.
 - `npm run check`: Runs lint + unit tests.
 - `npm run check:all`: Runs lint + unit + e2e tests.
@@ -201,6 +218,10 @@ PLAYWRIGHT_VISUAL=1 npm run test:e2e
    ```bash
    npm run check
    ```
+6. Optional landing-shell baseline (if Lighthouse tooling/network is available):
+   ```bash
+   LIGHTHOUSE_RUN=1 npm run test:lighthouse
+   ```
 
 ## Deployment
 This project is static and can be deployed to any static host.
@@ -213,12 +234,15 @@ Typical GitHub Pages flow:
 2. Ensure root files (`index.html`, `css/`, `scripts/`, `images/`) are published.
 3. Keep `CNAME` in the deployed root to retain custom-domain routing.
 
-## Website Health Check
-Last checked: **February 11, 2026**.
+Stable release tags (`v*`) now trigger `.github/workflows/deploy-stable-site.yml`, which runs checks, bundles static assets, and deploys to GitHub Pages automatically.
 
-- `npm run check` passed (lint + 31 unit/regression tests).
+## Website Health Check
+Last checked: **February 24, 2026**.
+
+- `npm ci` completed with lockfile-driven install.
+- `npm run check` passed (lint + 46 unit/regression/static checks).
 - `node --test tests/static-regression.test.js tests/pwa-regression.test.js` passed (8 static/PWA checks).
-- `npm run test:e2e` currently requires installed Playwright tooling (`npm install`, then `npx playwright install chromium`).
+- `npm run test:e2e` passed across desktop Chromium/Firefox/WebKit and mobile Chromium profiles (visual snapshot specs remain opt-in via `PLAYWRIGHT_VISUAL=1`).
 
 ## Security/Quality Notes
 - No backend is used; gameplay runs fully on the client.
@@ -236,3 +260,13 @@ The active roadmap is maintained in [`ROADMAP.md`](ROADMAP.md).
 Snapshot:
 - Core gameplay, replay, challenge modes, PWA support, and CI/release automation are in place.
 - Next priorities focus on maintainability, broader e2e/browser coverage, and deployment hardening.
+
+---
+
+<p align="center">
+  <video src="images/animation-footer.mov" controls loop muted playsinline></video>
+</p>
+
+<p align="center">
+  <a href="images/animation-footer.mov">animation-footer.mov</a>
+</p>

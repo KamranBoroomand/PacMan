@@ -267,6 +267,18 @@ body {
   display: none !important;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .desktop-only {
   display: inline-flex;
 }
@@ -515,7 +527,8 @@ body {
 .leaderboard-panel,
 .seed-tools,
 .sim-debug,
-.replay-tools {
+.replay-tools,
+.settings-transfer {
   grid-column: 1 / -1;
 }
 
