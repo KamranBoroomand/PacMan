@@ -108,7 +108,7 @@ This repository contains a classic Pac-Man style game implemented with plain HTM
 - `.github/workflows/release.yml`: Manual tag + changelog + GitHub release workflow.
 - `.github/workflows/deploy-stable-site.yml`: Automatic static deployment for stable release tags.
 - `lighthouse-budget.json`: Optional landing-shell Lighthouse budget baseline.
-- `scripts/lighthouse-baseline.js`: Optional local Lighthouse runner (`LIGHTHOUSE_RUN=1`).
+- `scripts/lighthouse-baseline.js`: Optional local Lighthouse runner (`LIGHTHOUSE_RUN=1`) with optional external-server mode (`LIGHTHOUSE_SKIP_SERVER=1`).
 
 ### Runtime Flow
 1. `game.js` initializes map state, actors, level tuning, replay seed, and UI handlers.
@@ -183,6 +183,7 @@ npm run check
 npm run check:all
 PLAYWRIGHT_VISUAL=1 npm run test:e2e
 LIGHTHOUSE_RUN=1 npm run test:lighthouse
+LIGHTHOUSE_RUN=1 LIGHTHOUSE_SKIP_SERVER=1 npm run test:lighthouse
 ```
 
 - `npm run lint`: Syntax + structural lint checks (`scripts/lint.js`).
@@ -192,7 +193,7 @@ LIGHTHOUSE_RUN=1 npm run test:lighthouse
 - `npm run test:e2e:mobile`: Mobile Chromium viewport/profile e2e lane.
 - `npm run test:e2e:perf`: Frame-time budget regression lane (Chromium desktop profile).
 - `npm run test:e2e:visual`: Runs Playwright with `PLAYWRIGHT_VISUAL=1` for snapshot checks.
-- `npm run test:lighthouse`: Optional Lighthouse baseline runner (requires `LIGHTHOUSE_RUN=1`).
+- `npm run test:lighthouse`: Optional Lighthouse baseline runner (set `LIGHTHOUSE_RUN=1`; starts a local static server unless `LIGHTHOUSE_SKIP_SERVER=1` is set).
 - `PLAYWRIGHT_VISUAL=1 npm run test:e2e`: Enables visual snapshot assertions in `tests/e2e/visual.spec.js`.
 - `npm run check`: Runs lint + unit tests.
 - `npm run check:all`: Runs lint + unit + e2e tests.
@@ -222,6 +223,10 @@ LIGHTHOUSE_RUN=1 npm run test:lighthouse
    ```bash
    LIGHTHOUSE_RUN=1 npm run test:lighthouse
    ```
+   If you already have a server running on `LIGHTHOUSE_PORT` (default `4173`), reuse it with:
+   ```bash
+   LIGHTHOUSE_RUN=1 LIGHTHOUSE_SKIP_SERVER=1 npm run test:lighthouse
+   ```
 
 ## Deployment
 This project is static and can be deployed to any static host.
@@ -237,12 +242,12 @@ Typical GitHub Pages flow:
 Stable release tags (`v*`) now trigger `.github/workflows/deploy-stable-site.yml`, which runs checks, bundles static assets, and deploys to GitHub Pages automatically.
 
 ## Website Health Check
-Last checked: **February 24, 2026**.
+Last checked: **February 28, 2026**.
 
-- `npm ci` completed with lockfile-driven install.
+- `package-lock.json` remains the source of truth for deterministic `npm ci` installs in CI.
 - `npm run check` passed (lint + 46 unit/regression/static checks).
-- `node --test tests/static-regression.test.js tests/pwa-regression.test.js` passed (8 static/PWA checks).
 - `npm run test:e2e` passed across desktop Chromium/Firefox/WebKit and mobile Chromium profiles (visual snapshot specs remain opt-in via `PLAYWRIGHT_VISUAL=1`).
+- `LIGHTHOUSE_RUN=1 npm run test:lighthouse` now fails fast with actionable startup errors when the local static server cannot bind/start.
 
 ## Security/Quality Notes
 - No backend is used; gameplay runs fully on the client.

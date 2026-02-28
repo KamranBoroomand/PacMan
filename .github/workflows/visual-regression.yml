@@ -23,7 +23,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Install Playwright browser
-        run: npx playwright install chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Run visual regression tests
         run: PLAYWRIGHT_VISUAL=1 npm run test:e2e -- --project=desktop-chromium

@@ -7,6 +7,7 @@ const path = require("node:path");
 const SHOULD_RUN = process.env.LIGHTHOUSE_RUN === "1";
 const PORT = Number.parseInt(process.env.LIGHTHOUSE_PORT || "4173", 10);
 const URL = `http://127.0.0.1:${PORT}/`;
+const SKIP_SERVER = process.env.LIGHTHOUSE_SKIP_SERVER === "1";
 const OUTPUT_DIR = path.resolve(".artifacts");
 const REPORT_PATH = path.join(OUTPUT_DIR, "lighthouse-report.json");
 
@@ -17,12 +18,29 @@ if (!SHOULD_RUN) {
 
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-const server = spawn("python3", ["-m", "http.server", String(PORT)], {
-  stdio: "ignore",
-});
+let server = null;
+let serverStartError = null;
+
+function startServer() {
+  if (SKIP_SERVER) {
+    return;
+  }
+
+  server = spawn("python3", ["-m", "http.server", String(PORT)], {
+    stdio: "ignore",
+  });
+
+  server.once("error", (error) => {
+    serverStartError = error;
+  });
+}
 
 function killServer() {
-  if (!server.killed) {
+  if (SKIP_SERVER || !server || server.killed) {
+    return;
+  }
+
+  if (server.exitCode === null) {
     server.kill("SIGTERM");
   }
 }
@@ -33,6 +51,16 @@ function wait(ms) {
 
 async function waitForServerReady(maxTries = 25) {
   for (let attempt = 0; attempt < maxTries; attempt += 1) {
+    if (serverStartError) {
+      throw new Error(`Failed to start static server: ${serverStartError.message}`);
+    }
+
+    if (server && server.exitCode !== null && server.exitCode !== 0) {
+      throw new Error(
+        `Static server exited early with code ${server.exitCode}. Check port ${PORT} availability.`
+      );
+    }
+
     const response = spawnSync("curl", ["-fsS", URL], {
       stdio: "ignore",
     });
@@ -41,6 +69,12 @@ async function waitForServerReady(maxTries = 25) {
     }
     await wait(250);
   }
+  if (SKIP_SERVER) {
+    throw new Error(
+      `Static server was not reachable at ${URL}. Start a server first or unset LIGHTHOUSE_SKIP_SERVER.`
+    );
+  }
+
   throw new Error(`Static server was not reachable at ${URL}`);
 }
 
@@ -54,6 +88,7 @@ function parseMetric(audits, id) {
 
 async function run() {
   try {
+    startServer();
     await waitForServerReady();
 
     const runResult = spawnSync(
