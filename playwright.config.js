@@ -1,5 +1,7 @@
 const { defineConfig, devices } = require("@playwright/test");
 
+const siteRoot = process.env.PACMAN_TEST_ROOT === "source" ? "." : "dist";
+
 module.exports = defineConfig({
   testDir: "./tests/e2e",
   timeout: 30000,
@@ -12,7 +14,7 @@ module.exports = defineConfig({
     },
   },
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: "http://127.0.0.1:4182",
     headless: true,
   },
   projects: [
@@ -43,9 +45,9 @@ module.exports = defineConfig({
     },
   ],
   webServer: {
-    command: "python3 -m http.server 4173",
-    url: "http://127.0.0.1:4173",
-    reuseExistingServer: true,
+    command: `node scripts/serve.js ${siteRoot} 4182`,
+    url: "http://127.0.0.1:4182",
+    reuseExistingServer: false,
     timeout: 20000,
   },
 });

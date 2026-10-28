@@ -1,7 +1,6 @@
 const canvas = document.getElementById("canvas");
 const canvasContext = canvas.getContext("2d");
-const pacmanFrames = document.getElementById("animation");
-const ghostFrames = document.getElementById("ghosts");
+const mazeRenderer = MazeRenderer.createMazeRenderer(canvasContext, () => document.createElement("canvas"));
 const startGameButton = document.getElementById("start-game");
 const pauseToggleButton = document.getElementById("pause-toggle");
 const restartGameButton = document.getElementById("restart-game");
@@ -56,367 +55,9 @@ const touchButtons = touchControlsRoot
 const virtualStickRoot = document.getElementById("virtual-stick");
 const stickBase = document.getElementById("stick-base");
 const stickKnob = document.getElementById("stick-knob");
+const hudRoot = document.getElementById("game-hud");
+const hud = hudRoot ? GameHud.createHud(hudRoot) : null;
 const accessibilityLiveRegion = document.getElementById("a11y-live-region");
-
-const DIRECTION_RIGHT = 4;
-const DIRECTION_UP = 3;
-const DIRECTION_LEFT = 2;
-const DIRECTION_BOTTOM = 1;
-
-const GAME_PHASE_START = "start";
-const GAME_PHASE_READY = "ready";
-const GAME_PHASE_PLAYING = "playing";
-const GAME_PHASE_PAUSED = "paused";
-const GAME_PHASE_DYING = "dying";
-const GAME_PHASE_INTERMISSION = "intermission";
-const GAME_PHASE_CUTSCENE = "cutscene";
-const GAME_PHASE_GAMEOVER = "gameover";
-
-const HUD_ROWS = 2;
-const FRAME_STEP_MS = 1000 / 60;
-const STARTING_LIVES = 3;
-const START_LEVEL = 1;
-const BONUS_LIFE_STEP = 10000;
-const SWIPE_THRESHOLD_PX = 24;
-const STICK_MAX_RADIUS = 54;
-const STICK_DEAD_ZONE = 14;
-const ROUND_READY_MS = 1800;
-const LIFE_LOSS_MS = 1100;
-const INTERMISSION_MS = 1500;
-const ATTRACT_IDLE_MS = 7000;
-const CHALLENGE_TIME_ATTACK_SECONDS = 120;
-const FRIGHTENED_FLASH_WINDOW_MS = 2200;
-const FRIGHTENED_FLASH_INTERVAL_MS = 180;
-const MIN_FRUIT_SPAWN_DISTANCE = 8;
-const MIN_GHOST_INITIAL_SPAWN_DISTANCE = 7;
-const SETTINGS_STORAGE_KEY = "pacman.settings.v1";
-const HIGH_SCORE_STORAGE_KEY = "pacman.highScore";
-const DAILY_CHALLENGE_STORAGE_KEY = "pacman.daily.v1";
-const LEADERBOARD_STORAGE_KEY = "pacman.leaderboard.v1";
-const ARCADE_VIEW_STORAGE_KEY = "pacman.arcadeView.enabled";
-const REPLAY_HASH_PREFIX = "#replay=";
-const REPLAY_SCHEMA_VERSION = 2;
-const SETTINGS_TRANSFER_SCHEMA_VERSION = 1;
-const SCORE_ANNOUNCEMENT_STEP = 100;
-const PERF_GUARDRAIL_CONFIG = Object.freeze({
-  minSamples: 120,
-  windowSize: 300,
-  slowFrameMs: 34,
-  severeFrameMs: 50,
-  maxSlowRatio: 0.12,
-  maxSevereRatio: 0.03,
-  maxP95Ms: 36,
-  maxP99Ms: 54,
-  breachCooldownMs: 8000,
-});
-const SETTINGS_TRANSFER_KEYS = Object.freeze([
-  "muted",
-  "volume",
-  "sfxVolume",
-  "musicVolume",
-  "musicEnabled",
-  "hapticsEnabled",
-  "mobileInputMode",
-  "paletteMode",
-  "reducedMotion",
-  "largeHud",
-  "oneHandedMode",
-  "debugOverlay",
-  "gamepadMap",
-  "keybinds",
-]);
-const DEFAULT_GAMEPAD_MAP = {
-  start: 9,
-  pause: 3,
-  restart: 1,
-  mute: 2,
-};
-const MUSIC_STEP_INTERVAL_MS = 250;
-const GHOST_HOME_TILE = { x: 21, y: 13 };
-const GHOST_HOUSE_EXIT_TILE = { x: 21, y: 12 };
-const GHOST_HOUSE_EXIT_BY_PERSONALITY = {
-  blinky: { x: 21, y: 11 },
-  pinky: { x: 21, y: 12 },
-  inky: { x: 21, y: 12 },
-  clyde: { x: 21, y: 12 },
-};
-const BASE_AUDIO_GAIN = 0.25;
-const ANALYTICS_EVENT_NAME = "pacman:analytics";
-const GHOST_MODE_SCHEDULE = [
-  { mode: "scatter", durationMs: 7000 },
-  { mode: "chase", durationMs: 20000 },
-  { mode: "scatter", durationMs: 7000 },
-  { mode: "chase", durationMs: 20000 },
-  { mode: "scatter", durationMs: 5000 },
-  { mode: "chase", durationMs: 20000 },
-  { mode: "scatter", durationMs: 5000 },
-  { mode: "chase", durationMs: Infinity },
-];
-
-const GHOST_MODE_SCHEDULE_BY_LEVEL = [
-  GHOST_MODE_SCHEDULE,
-  GHOST_MODE_SCHEDULE,
-  GHOST_MODE_SCHEDULE,
-  [
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: Infinity },
-  ],
-  [
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: Infinity },
-  ],
-  [
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 1033000 },
-    { mode: "scatter", durationMs: 17 },
-    { mode: "chase", durationMs: Infinity },
-  ],
-];
-
-const CUTSCENES_BY_LEVEL = {
-  2: {
-    title: "Act 1",
-    subtitle: "Blinky chases Pac-Man",
-    durationMs: 4400,
-    tone: "amber",
-  },
-  5: {
-    title: "Act 2",
-    subtitle: "Blinky slows, Pac-Man flips momentum",
-    durationMs: 4600,
-    tone: "cyan",
-  },
-  9: {
-    title: "Act 3",
-    subtitle: "Fast chase finale",
-    durationMs: 4800,
-    tone: "rose",
-  },
-};
-
-const ATTRACT_DEMO_INPUTS = [
-  { frame: 4, action: "right" },
-  { frame: 40, action: "right" },
-  { frame: 72, action: "up" },
-  { frame: 118, action: "left" },
-  { frame: 190, action: "left" },
-  { frame: 242, action: "down" },
-  { frame: 310, action: "right" },
-  { frame: 378, action: "right" },
-  { frame: 430, action: "down" },
-  { frame: 480, action: "left" },
-  { frame: 548, action: "left" },
-  { frame: 606, action: "up" },
-  { frame: 660, action: "right" },
-];
-
-const CHALLENGE_MODES = {
-  CLASSIC: "classic",
-  TIME_ATTACK: "time-attack",
-  NO_POWER: "no-power",
-  ONE_LIFE: "one-life",
-};
-
-const COLOR_PALETTES = {
-  classic: {
-    background: "black",
-    wallOuter: "#342DCA",
-    wallInner: "black",
-    pellet: "#FEB897",
-    powerPellet: "#F7FF8A",
-    textPrimary: "white",
-    textHigh: "#FFE16A",
-    textAccent: "#B8D8FF",
-    textMode: "#78F7FF",
-    textFruit: "#FFC95A",
-    toastBonus: "#78F7FF",
-    popupGhost: "#78F7FF",
-    popupFruit: "#FFE16A",
-    overlayTitle: "#FFDE00",
-    overlaySubtitle: "#DDE7FF",
-  },
-  colorblind: {
-    background: "#05080f",
-    wallOuter: "#1E50FF",
-    wallInner: "#09121D",
-    pellet: "#FFDEA6",
-    powerPellet: "#F5FF7B",
-    textPrimary: "#F3F7FF",
-    textHigh: "#FFE178",
-    textAccent: "#ADD4FF",
-    textMode: "#7EEBFF",
-    textFruit: "#FFD089",
-    toastBonus: "#84F2FF",
-    popupGhost: "#84F2FF",
-    popupFruit: "#FFE178",
-    overlayTitle: "#FFE178",
-    overlaySubtitle: "#E4EFFF",
-  },
-  "high-contrast": {
-    background: "#000000",
-    wallOuter: "#4E6BFF",
-    wallInner: "#000000",
-    pellet: "#FFFFFF",
-    powerPellet: "#FFFFFF",
-    textPrimary: "#FFFFFF",
-    textHigh: "#FFFF66",
-    textAccent: "#CFE1FF",
-    textMode: "#7CFFFF",
-    textFruit: "#FFD700",
-    toastBonus: "#7CFFFF",
-    popupGhost: "#7CFFFF",
-    popupFruit: "#FFFF66",
-    overlayTitle: "#FFFF66",
-    overlaySubtitle: "#FFFFFF",
-  },
-};
-
-const GHOST_DEFINITIONS = [
-  {
-    id: "blinky",
-    displayName: "Blinky",
-    spriteIndex: 0,
-    scatterTile: { x: 42, y: 1 },
-    startInHouse: false,
-    releaseDotThreshold: 0,
-    forceReleaseMs: 0,
-    spawnTile: { x: 21, y: 11 },
-  },
-  {
-    id: "pinky",
-    displayName: "Pinky",
-    spriteIndex: 1,
-    scatterTile: { x: 1, y: 1 },
-    startInHouse: true,
-    releaseDotThreshold: 0,
-    forceReleaseMs: 700,
-    spawnTile: { x: 20, y: 13 },
-  },
-  {
-    id: "inky",
-    displayName: "Inky",
-    spriteIndex: 2,
-    scatterTile: { x: 42, y: 29 },
-    startInHouse: true,
-    releaseDotThreshold: 6,
-    forceReleaseMs: 1800,
-    spawnTile: { x: 21, y: 13 },
-  },
-  {
-    id: "clyde",
-    displayName: "Clyde",
-    spriteIndex: 3,
-    scatterTile: { x: 1, y: 29 },
-    startInHouse: true,
-    releaseDotThreshold: 14,
-    forceReleaseMs: 3200,
-    spawnTile: { x: 22, y: 13 },
-  },
-];
-
-const ghostImageLocations = [
-  { x: 0, y: 0 },
-  { x: 176, y: 0 },
-  { x: 0, y: 121 },
-  { x: 176, y: 121 },
-];
-
-const FRUIT_TABLE = [
-  { name: "Cherry", points: 100, color: "#FF2E59" },
-  { name: "Strawberry", points: 300, color: "#FF5A7A" },
-  { name: "Orange", points: 500, color: "#FF9F1A" },
-  { name: "Apple", points: 700, color: "#88D43F" },
-  { name: "Melon", points: 1000, color: "#4FD1C5" },
-  { name: "Galaxian", points: 2000, color: "#7C83FF" },
-  { name: "Bell", points: 3000, color: "#FDE047" },
-  { name: "Key", points: 5000, color: "#F8FAFC" },
-];
-
-const DEFAULT_KEYBINDS = {
-  left: "a",
-  up: "w",
-  right: "d",
-  down: "s",
-  pause: "p",
-  restart: "r",
-  mute: "m",
-  start: "enter",
-};
-
-const DEFAULT_SETTINGS = {
-  muted: false,
-  volume: 70,
-  sfxVolume: 78,
-  musicVolume: 40,
-  musicEnabled: true,
-  hapticsEnabled: false,
-  mobileInputMode: "buttons",
-  challengeMode: CHALLENGE_MODES.CLASSIC,
-  paletteMode: "classic",
-  reducedMotion: false,
-  largeHud: false,
-  oneHandedMode: false,
-  debugOverlay: false,
-  simDebugEnabled: false,
-  simPaused: false,
-  gamepadMap: { ...DEFAULT_GAMEPAD_MAP },
-  keybinds: { ...DEFAULT_KEYBINDS },
-};
-
-const SFX_LIBRARY = {
-  pellet: [
-    { frequency: 430, duration: 0.04, volume: 0.08, wave: "square", offset: 0 },
-  ],
-  powerPellet: [
-    { frequency: 290, duration: 0.07, volume: 0.14, wave: "square", offset: 0 },
-    { frequency: 540, duration: 0.08, volume: 0.12, wave: "triangle", offset: 0.07 },
-  ],
-  fruit: [
-    { frequency: 580, duration: 0.06, volume: 0.12, wave: "triangle", offset: 0 },
-    { frequency: 760, duration: 0.08, volume: 0.12, wave: "triangle", offset: 0.05 },
-  ],
-  ghostEaten: [
-    { frequency: 860, duration: 0.05, volume: 0.13, wave: "square", offset: 0 },
-    { frequency: 640, duration: 0.07, volume: 0.13, wave: "square", offset: 0.06 },
-  ],
-  death: [
-    { frequency: 520, duration: 0.11, volume: 0.14, wave: "sawtooth", offset: 0 },
-    { frequency: 330, duration: 0.13, volume: 0.13, wave: "sawtooth", offset: 0.1 },
-    { frequency: 180, duration: 0.16, volume: 0.1, wave: "triangle", offset: 0.2 },
-  ],
-  levelClear: [
-    { frequency: 520, duration: 0.08, volume: 0.11, wave: "triangle", offset: 0 },
-    { frequency: 680, duration: 0.08, volume: 0.11, wave: "triangle", offset: 0.08 },
-    { frequency: 920, duration: 0.12, volume: 0.12, wave: "triangle", offset: 0.16 },
-  ],
-  extraLife: [
-    { frequency: 620, duration: 0.08, volume: 0.11, wave: "triangle", offset: 0 },
-    { frequency: 820, duration: 0.08, volume: 0.11, wave: "triangle", offset: 0.09 },
-    { frequency: 1040, duration: 0.12, volume: 0.12, wave: "triangle", offset: 0.18 },
-  ],
-  ui: [{ frequency: 460, duration: 0.04, volume: 0.08, wave: "square", offset: 0 }],
-};
-
-const MUSIC_SEQUENCE = [
-  { frequency: 262, duration: 0.18, volume: 0.08, wave: "triangle" },
-  { frequency: 330, duration: 0.18, volume: 0.08, wave: "triangle" },
-  { frequency: 392, duration: 0.18, volume: 0.08, wave: "triangle" },
-  { frequency: 523, duration: 0.2, volume: 0.09, wave: "triangle" },
-  { frequency: 392, duration: 0.18, volume: 0.08, wave: "triangle" },
-  { frequency: 330, duration: 0.18, volume: 0.08, wave: "triangle" },
-];
 
 let renderScale = 1;
 let dpr = 1;
@@ -424,10 +65,8 @@ let logicalW = 0;
 let logicalH = 0;
 
 let oneBlockSize = 20;
-let fps = 60;
 let pacman = null;
 let ghosts = [];
-let wallTiles = [];
 let score = 0;
 let highScore = 0;
 let lives = STARTING_LIVES;
@@ -435,8 +74,6 @@ let level = START_LEVEL;
 let nextBonusLifeScore = BONUS_LIFE_STEP;
 let phase = GAME_PHASE_START;
 let phaseUntil = 0;
-let phaseMessage = "Press Start";
-let phaseMessageSecondary = "";
 let roundStartAt = 0;
 let frightenedUntil = 0;
 let ghostEatChain = 0;
@@ -450,8 +87,16 @@ let initialFoodCount = 0;
 let levelsClearedThisRun = 0;
 let pointPopups = [];
 let hudToasts = [];
-let lastUpdateNow = performance.now();
-let frameAccumulator = 0;
+let lastUpdateNow = 0;
+let logicalTick = 0;
+let previousRenderNow = null;
+let manualStepping = false;
+let pendingInputs = [];
+let ghostModeElapsedMs = 0;
+let runDurationMs = 0;
+let pausedPhase = null;
+let pausedPhaseUntil = 0;
+const frameScheduler = SimulationClock.createFrameScheduler(update);
 let animationFrameId = null;
 let swipeStartX = null;
 let swipeStartY = null;
@@ -462,10 +107,14 @@ let stickMaxRadius = STICK_MAX_RADIUS;
 let pendingRebindAction = null;
 let settings = loadSettings();
 let arcadeViewEnabled = false;
-let audioContext = null;
-let audioMasterGain = null;
-let audioSfxGain = null;
-let audioMusicGain = null;
+const gameAudio = GameAudio.createAudioEngine({
+  getSettings: () => settings,
+  canPlay: () => !manualStepping,
+  sfx: SFX_LIBRARY,
+  music: MUSIC_SEQUENCE,
+  stepMs: MUSIC_STEP_INTERVAL_MS,
+  baseGain: BASE_AUDIO_GAIN,
+});
 let deferredInstallPrompt = null;
 let swRegistration = null;
 let swUpdateReady = false;
@@ -473,7 +122,7 @@ let gamepadButtonsState = [];
 let challengeTimeRemainingMs = CHALLENGE_TIME_ATTACK_SECONDS * 1000;
 let attractModeActive = false;
 let attractTriggeredThisIdleWindow = false;
-let lastUserIntentAt = performance.now();
+let lastUserIntentAt = 0;
 let challengeModeBeforeAttract = null;
 let activeCutscene = null;
 let simulationFrame = 0;
@@ -487,9 +136,6 @@ let activeRunIsDaily = false;
 let activeRunIsReplay = false;
 let runResultCommitted = false;
 let simStepRequests = 0;
-let musicLastStepAt = 0;
-let musicStepIndex = 0;
-let musicDuckingUntil = 0;
 let replayCodec = null;
 let framePacingMonitor = null;
 let framePacingSnapshot = null;
@@ -521,78 +167,8 @@ let createRect = (x, y, width, height, color) => {
 };
 
 // Legend: 1 = wall, 2 = pellet, 4 = power pellet, 0 = empty path
-const classicMap = [
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
-  [1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1],
-  [1,2,1,0,0,1,2,1,1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1,1,2,1,0,0,1,2,1],
-  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
-  [1,2,1,1,2,1,2,1,1,2,1,1,1,1,2,1,1,2,1,1,1,1,1,1,1,1,2,1,1,1,2,1,1,1,2,1,1,2,1,2,1,1,2,1],
-  [1,2,2,1,2,1,2,1,1,2,2,2,2,2,2,1,1,2,2,2,2,1,1,2,2,2,2,1,1,2,2,2,2,2,2,1,1,2,1,2,1,2,2,1],
-  [1,1,1,1,2,1,2,1,1,1,1,1,1,1,2,1,1,1,1,1,0,1,1,0,1,1,1,1,1,2,1,1,1,1,1,1,1,2,1,2,1,1,1,1],
-  [0,0,0,0,2,0,0,0,0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,1,0,0,0,0,0,0,0,0,2,0,0,0,0],
-  [1,1,1,1,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,1,1,1,2,1,2,1,1,1,1],
-  [1,2,2,2,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,1,1,1,2,1,2,2,2,2,1],
-  [1,2,1,0,0,1,2,1,1,2,2,2,2,2,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,2,2,2,2,2,1,1,2,1,0,0,1,2,1],
-  [1,2,1,2,2,1,2,1,1,2,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,2,1,1,2,1,2,2,1,2,1],
-  [1,2,1,2,2,1,2,1,1,2,2,2,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,2,2,2,2,2,1,1,2,1,2,2,1,2,1],
-  [1,2,2,2,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,1,1,1,1,1,2,1,2,2,2,2,1],
-  [0,0,0,0,2,0,0,0,0,0,0,0,0,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,0,0,0,0,0,0,0,0,2,0,0,0,0],
-  [1,2,1,1,1,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,0,1,1,1,1,0,1,1,2,1,1,1,1,1,1,1,2,1,1,1,1,2,1],
-  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
-  [1,2,1,2,2,1,2,1,1,2,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,1,1,2,1,1,2,1,2,2,1,2,1],
-  [1,2,1,0,0,1,2,1,1,2,2,2,2,2,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,2,2,2,2,2,1,1,2,1,0,0,1,2,1],
-  [1,2,2,2,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,2,1,2,2,2,2,1],
-  [1,2,1,1,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,2,1,2,1,1,2,1],
-  [1,2,1,2,2,1,2,1,1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,2,1,2,2,1,2,1],
-  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
-  [1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1],
-  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
-  [1,2,1,2,2,1,2,1,1,2,1,1,2,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,2,1,2,1,1,2,1,2,2,1,2,1],
-  [1,2,2,0,0,1,2,1,1,2,2,2,1,2,2,2,2,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,1,2,2,1,1,2,1,0,0,2,2,1],
-  [1,2,1,1,1,1,2,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,2,1,1,1,1,2,1],
-  [1,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,1],
-  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-];
-
-const wingConnectorRows = [4, 11, 17, 23, 29];
-for (let i = 0; i < wingConnectorRows.length; i++) {
-  const row = wingConnectorRows[i];
-  classicMap[row][7] = 2;
-  classicMap[row][8] = 2;
-  classicMap[row][35] = 2;
-  classicMap[row][36] = 2;
-}
-
-const horizontalTunnelRows = [8, 15, 27];
-for (let i = 0; i < horizontalTunnelRows.length; i++) {
-  const row = horizontalTunnelRows[i];
-  const lastColumn = classicMap[row].length - 1;
-  const tunnelDepth = 4;
-  classicMap[row][0] = 0;
-  classicMap[row][lastColumn] = 0;
-
-  for (let x = 1; x <= tunnelDepth; x++) {
-    classicMap[row][x] = 2;
-    classicMap[row][lastColumn - x] = 2;
-  }
-}
-
-for (let y = 18; y <= 26; y++) {
-  classicMap[y][21] = 2;
-  classicMap[y][22] = 2;
-}
-
-const mapLastColumn = classicMap[0].length - 1;
-const pacmanStart = { x: 21, y: 23 };
-classicMap[1][1] = 4;
-classicMap[1][mapLastColumn - 1] = 4;
-classicMap[26][1] = 4;
-classicMap[26][mapLastColumn - 1] = 4;
-classicMap[pacmanStart.y][pacmanStart.x] = 0;
-classicMap[pacmanStart.y][pacmanStart.x + 1] = 0;
-
-const cloneClassicMap = () => classicMap.map((row) => row.slice());
+const pacmanStart = Maze.start;
+const cloneClassicMap = Maze.createMap;
 let map = cloneClassicMap();
 
 let randomTargetsForGhosts = [
@@ -745,21 +321,12 @@ function trackAnalyticsEvent(eventName, detail = {}) {
     // Ignore analytics dispatch failures.
   }
 
-  if (Array.isArray(window.dataLayer)) {
-    window.dataLayer.push(payload);
-  }
 }
 
 function noteUserIntent() {
-  lastUserIntentAt = lastUpdateNow || performance.now();
+  lastUserIntentAt = lastUpdateNow;
   attractTriggeredThisIdleWindow = false;
 
-  if (isReplayRunning()) {
-    replayPlayback = null;
-    activeRunIsReplay = false;
-    renderReplayButton();
-    addHudToast("Replay canceled", getCurrentPalette().textMode, 900);
-  }
 
   if (attractModeActive) {
     attractModeActive = false;
@@ -853,7 +420,7 @@ function announceForAssistiveTools(message, options = {}) {
   const trimmed = message.trim();
   if (!trimmed) return;
 
-  const now = lastUpdateNow || performance.now();
+  const now = lastUpdateNow;
   const minGapMs = Number.isFinite(options.minGapMs) ? options.minGapMs : 640;
   const shouldRateLimit = options.force !== true;
   const isDuplicate = trimmed === lastA11yAnnouncement;
@@ -1027,7 +594,7 @@ function validateSettings(raw) {
       raw && raw.mobileInputMode === "stick" ? "stick" : "buttons",
     challengeMode,
     paletteMode,
-    reducedMotion: Boolean(raw && raw.reducedMotion),
+    reducedMotion: typeof (raw && raw.reducedMotion) === "boolean" ? raw.reducedMotion : window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     largeHud: Boolean(raw && raw.largeHud),
     oneHandedMode: Boolean(raw && raw.oneHandedMode),
     debugOverlay: Boolean(raw && raw.debugOverlay),
@@ -1060,25 +627,30 @@ function validateSettings(raw) {
   return safe;
 }
 
+function getBrowserStorage() {
+  try { return window.localStorage; } catch { return null; }
+}
+
 function loadSettings() {
+  const defaults = { ...DEFAULT_SETTINGS, reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches };
   const storage = getGameStorage();
   if (storage && typeof storage.loadValidatedSettings === "function") {
     return storage.loadValidatedSettings({
-      storage: localStorage,
+      storage: getBrowserStorage(),
       key: SETTINGS_STORAGE_KEY,
-      defaults: DEFAULT_SETTINGS,
+      defaults,
       validate: validateSettings,
     });
   }
 
-  return validateSettings(DEFAULT_SETTINGS);
+  return validateSettings(defaults);
 }
 
 function persistSettings() {
   const storage = getGameStorage();
   if (storage && typeof storage.persistSettings === "function") {
     storage.persistSettings({
-      storage: localStorage,
+      storage: getBrowserStorage(),
       key: SETTINGS_STORAGE_KEY,
       settings,
     });
@@ -1089,7 +661,7 @@ function readHighScoreFromStorage() {
   const storage = getGameStorage();
   if (storage && typeof storage.readHighScore === "function") {
     return storage.readHighScore({
-      storage: localStorage,
+      storage: getBrowserStorage(),
       key: HIGH_SCORE_STORAGE_KEY,
     });
   }
@@ -1100,7 +672,7 @@ function persistHighScore() {
   const storage = getGameStorage();
   if (storage && typeof storage.persistHighScore === "function") {
     storage.persistHighScore({
-      storage: localStorage,
+      storage: getBrowserStorage(),
       key: HIGH_SCORE_STORAGE_KEY,
       highScore,
     });
@@ -1111,7 +683,7 @@ function loadDailyChallengeState() {
   const storage = getGameStorage();
   if (storage && typeof storage.loadDailyState === "function") {
     return storage.loadDailyState({
-      storage: localStorage,
+      storage: getBrowserStorage(),
       key: DAILY_CHALLENGE_STORAGE_KEY,
       maxHistory: 30,
     });
@@ -1129,7 +701,7 @@ function persistDailyChallengeState() {
   const storage = getGameStorage();
   if (storage && typeof storage.persistDailyState === "function") {
     storage.persistDailyState({
-      storage: localStorage,
+      storage: getBrowserStorage(),
       key: DAILY_CHALLENGE_STORAGE_KEY,
       state: dailyChallengeState,
     });
@@ -1140,7 +712,7 @@ function loadLeaderboardState() {
   const storage = getGameStorage();
   if (storage && typeof storage.loadLeaderboardState === "function") {
     return storage.loadLeaderboardState({
-      storage: localStorage,
+      storage: getBrowserStorage(),
       key: LEADERBOARD_STORAGE_KEY,
     });
   }
@@ -1152,7 +724,7 @@ function persistLeaderboardState() {
   const storage = getGameStorage();
   if (storage && typeof storage.persistLeaderboardState === "function") {
     storage.persistLeaderboardState({
-      storage: localStorage,
+      storage: getBrowserStorage(),
       key: LEADERBOARD_STORAGE_KEY,
       state: leaderboardState,
     });
@@ -1257,13 +829,15 @@ function addDailyHistoryEntry({ dateKey, seed, scoreValue, completed }) {
 }
 
 function syncHighScore() {
+  if (attractModeActive || activeRunIsReplay) return;
+  const previousHighScore = highScore;
   const utils = getGameplayUtils();
   if (utils && typeof utils.updateHighScore === "function") {
     highScore = utils.updateHighScore(highScore, score);
   } else {
     highScore = Math.max(highScore, score);
   }
-  persistHighScore();
+  if (highScore !== previousHighScore) persistHighScore();
 }
 
 function loadArcadeViewPreference() {
@@ -1304,10 +878,12 @@ function renderPauseButton() {
 
 function renderStartButton() {
   if (!startGameButton) return;
-  if (phase === GAME_PHASE_START || phase === GAME_PHASE_GAMEOVER) {
-    startGameButton.textContent = "Start";
+  if (phase === GAME_PHASE_START || phase === GAME_PHASE_GAMEOVER || replayPlayback?.completed) {
+    startGameButton.textContent = "Start game";
+    startGameButton.disabled = false;
   } else {
-    startGameButton.textContent = "Play";
+    startGameButton.textContent = phase === GAME_PHASE_CUTSCENE ? "Skip scene" : "Start game";
+    startGameButton.disabled = phase !== GAME_PHASE_CUTSCENE;
   }
 }
 
@@ -1332,12 +908,14 @@ function renderUpdateButton() {
 function renderReplayButton() {
   if (!replayLastButton) return;
   const replayAvailable = Boolean(replayLastRun && Array.isArray(replayLastRun.events));
-  replayLastButton.disabled = !replayAvailable || isReplayRunning();
-  replayLastButton.textContent = isReplayRunning() ? "Replaying..." : "Replay";
+  const playing = isReplayRunning() && !replayPlayback.completed;
+  replayLastButton.disabled = !replayAvailable || playing;
+  replayLastButton.textContent = playing ? "Replaying..." : (replayPlayback?.completed ? "Replay again" : "Replay");
 }
 
 function renderReplayStatus(message) {
   if (!replayStatus) return;
+  if (!message && replayPlayback?.completed) message = replayPlayback.message;
   if (message) {
     replayStatus.textContent = message;
     return;
@@ -1450,7 +1028,7 @@ function renderDailyStatus() {
   dailyStatus.textContent = `${statusLine}\nStreak: ${streak} day${streak === 1 ? "" : "s"}`;
 
   if (dailyChallengeButton) {
-    dailyChallengeButton.textContent = completedToday ? "Daily Done" : "Daily";
+    dailyChallengeButton.textContent = completedToday ? "Daily completed" : "Daily challenge";
     dailyChallengeButton.setAttribute("aria-pressed", String(completedToday));
   }
 }
@@ -1696,6 +1274,8 @@ function measureCanvasShellOverhead() {
 
   const shellStyle = window.getComputedStyle(canvasShell);
   let overheadHeight =
+    getVisibleElementHeight(document.getElementById("game-hud")) +
+    getVisibleElementHeight(document.querySelector(".board-caption")) + 24 +
     parseCssLength(shellStyle.paddingTop) +
     parseCssLength(shellStyle.paddingBottom) +
     parseCssLength(shellStyle.borderTopWidth) +
@@ -1742,7 +1322,7 @@ function measureNonCanvasUiHeight() {
     : 0;
 
   const headerHeight = getVisibleElementHeight(document.querySelector(".site-header"));
-  const settingsHeight = getVisibleElementHeight(settingsPanel);
+  const settingsHeight = getVisibleElementHeight(settingsPanel ? settingsPanel.querySelector("summary") : null);
   const footerHeight = getVisibleElementHeight(document.querySelector(".site-footer"));
 
   return (
@@ -1768,9 +1348,9 @@ function getCanvasMaxWidth() {
       parseCssLength(shellStyle.borderRightWidth)
     : 0;
 
-  const fallbackWidth = Math.max(280, window.innerWidth - 24);
+  const fallbackWidth = Math.max(120, window.innerWidth - 24);
   const gameShellWidth = gameShell ? gameShell.clientWidth : fallbackWidth;
-  return Math.max(280, gameShellWidth - shellHorizontalChrome);
+  return Math.max(120, gameShellWidth - shellHorizontalChrome);
 }
 
 function resizeCanvasToFitViewport() {
@@ -1806,15 +1386,11 @@ function quantizeSpeed(rawSpeed) {
 }
 
 function rebuildMapCaches() {
-  wallTiles = [];
   remainingFoodCount = 0;
   initialFoodCount = 0;
 
   for (let y = 0; y < map.length; y++) {
     for (let x = 0; x < map[0].length; x++) {
-      if (map[y][x] === 1) {
-        wallTiles.push({ x, y });
-      }
       if (map[y][x] === 2 || map[y][x] === 4) {
         remainingFoodCount++;
       }
@@ -1948,90 +1524,14 @@ function getFruitSpecForLevel(currentLevel) {
   return FRUIT_TABLE[index];
 }
 
-function ensureAudioContextReady() {
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return null;
-
-  if (!audioContext) {
-    audioContext = new AudioContextClass();
-    audioMasterGain = audioContext.createGain();
-    audioSfxGain = audioContext.createGain();
-    audioMusicGain = audioContext.createGain();
-    audioSfxGain.connect(audioMasterGain);
-    audioMusicGain.connect(audioMasterGain);
-    audioMasterGain.connect(audioContext.destination);
-  }
-
-  if (audioContext.state === "suspended") {
-    audioContext.resume().catch(() => {
-      // Browsers may block autoplay until the next interaction.
-    });
-  }
-
-  applyAudioSettings();
-  return audioContext;
-}
-
-function applyAudioSettings() {
-  if (!audioMasterGain || !audioContext || !audioSfxGain || !audioMusicGain) return;
-  const volumeScale = Math.max(0, Math.min(1, settings.volume / 100));
-  const targetGain = settings.muted ? 0 : BASE_AUDIO_GAIN * volumeScale;
-  audioMasterGain.gain.setValueAtTime(targetGain, audioContext.currentTime);
-
-  const sfxScale = Math.max(0, Math.min(1, settings.sfxVolume / 100));
-  const musicScale = Math.max(0, Math.min(1, settings.musicVolume / 100));
-  const duckingScale = lastUpdateNow < musicDuckingUntil ? 0.35 : 1;
-  audioSfxGain.gain.setValueAtTime(sfxScale, audioContext.currentTime);
-  audioMusicGain.gain.setValueAtTime(settings.musicEnabled ? musicScale * duckingScale : 0, audioContext.currentTime);
-}
-
-function playTone({ frequency, duration, volume, wave, offset, channel }) {
-  if (settings.muted) return;
-  const ctx = ensureAudioContextReady();
-  if (!ctx || !audioMasterGain || !audioSfxGain || !audioMusicGain) return;
-
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  const startTime = ctx.currentTime + (offset || 0);
-  const endTime = startTime + duration;
-
-  osc.type = wave || "square";
-  osc.frequency.setValueAtTime(frequency, startTime);
-
-  gain.gain.setValueAtTime(0.0001, startTime);
-  gain.gain.linearRampToValueAtTime(volume, startTime + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, endTime);
-
-  osc.connect(gain);
-  gain.connect(channel === "music" ? audioMusicGain : audioSfxGain);
-  osc.start(startTime);
-  osc.stop(endTime + 0.01);
-}
-
+function ensureAudioContextReady() { return gameAudio.prime(); }
+function applyAudioSettings() { gameAudio.applySettings(); }
 function playGameSfx(type) {
-  const pattern = SFX_LIBRARY[type];
-  if (!Array.isArray(pattern)) return;
-  musicDuckingUntil = Math.max(musicDuckingUntil, lastUpdateNow + 200);
-  applyAudioSettings();
-  for (let i = 0; i < pattern.length; i++) {
-    playTone({ ...pattern[i], channel: "sfx" });
-  }
-
-  triggerHapticFeedback(type);
+  gameAudio.play(type);
+  if (!manualStepping) triggerHapticFeedback(type);
 }
-
 function updateBackgroundMusic() {
-  if (!settings.musicEnabled || settings.muted) return;
-  if (phase !== GAME_PHASE_PLAYING && phase !== GAME_PHASE_READY) return;
-  if (!audioContext || !audioMusicGain) return;
-  if (lastUpdateNow - musicLastStepAt < MUSIC_STEP_INTERVAL_MS) return;
-
-  musicLastStepAt = lastUpdateNow;
-  const note = MUSIC_SEQUENCE[musicStepIndex % MUSIC_SEQUENCE.length];
-  musicStepIndex = (musicStepIndex + 1) % MUSIC_SEQUENCE.length;
-  if (note) {
-    playTone({ ...note, channel: "music" });
-  }
+  gameAudio.tick(lastUpdateNow, phase === GAME_PHASE_PLAYING || phase === GAME_PHASE_READY);
 }
 
 function triggerHapticFeedback(type) {
@@ -2164,14 +1664,11 @@ function getLevelTuning(levelNumber) {
 function applyLevelTuning(levelNumber) {
   currentLevelTuning = getLevelTuning(levelNumber);
   currentGhostModeSchedule = getGhostModeScheduleForLevel(levelNumber);
-  fps = 60;
 }
 
 function setPhase(nextPhase, options = {}) {
   const previousPhase = phase;
   phase = nextPhase;
-  phaseMessage = options.message || "";
-  phaseMessageSecondary = options.secondary || "";
   phaseUntil = options.durationMs ? lastUpdateNow + options.durationMs : 0;
   renderPauseButton();
   renderStartButton();
@@ -2357,7 +1854,7 @@ function updateGhostGlobalMode() {
   if (isGhostFrightened()) return;
 
   const utils = getGameplayUtils();
-  const elapsed = Math.max(0, lastUpdateNow - roundStartAt);
+  const elapsed = ghostModeElapsedMs;
 
   if (utils && typeof utils.computeScatterChaseMode === "function") {
     ghostGlobalMode = utils.computeScatterChaseMode(elapsed, currentGhostModeSchedule);
@@ -2640,10 +2137,6 @@ function createGhosts() {
       oneBlockSize,
       oneBlockSize,
       quantizeSpeed((pacman.speed * 0.86) * currentLevelTuning.ghostSpeedMultiplier),
-      ghostImageLocations[def.spriteIndex].x,
-      ghostImageLocations[def.spriteIndex].y,
-      124,
-      116,
       6 + i,
       {
         personality: def.id,
@@ -2672,6 +2165,7 @@ function disposeActors() {
 }
 
 function prepareRound() {
+  ghostModeElapsedMs = 0;
   clearFrightenedMode();
   ghostGlobalMode = "scatter";
   lastGhostGlobalMode = "scatter";
@@ -2685,6 +2179,7 @@ function prepareRound() {
 function beginReplayCapture(seed) {
   replayCurrentRun = {
     schemaVersion: getReplaySchemaVersion(),
+    rulesetVersion: ReplayTools.RULESET_VERSION,
     seed,
     challengeMode: settings.challengeMode,
     events: [],
@@ -2706,14 +2201,6 @@ function encodeReplayToString(replayData) {
     return codec.encode(replayData);
   }
   return "";
-}
-
-function decodeReplayFromString(encoded) {
-  const codec = getReplayCodec();
-  if (codec && typeof codec.decode === "function") {
-    return codec.decode(encoded);
-  }
-  return null;
 }
 
 function parseReplayFromUrlHash() {
@@ -2796,6 +2283,7 @@ function importReplayPayload(payload) {
 }
 
 function handleReplayFileSelection(file) {
+  if (file && file.size > 2_000_000) { renderReplayStatus("Replay is too large (maximum 2 MB)."); return; }
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
@@ -2880,6 +2368,7 @@ function importSettingsPayload(payload) {
 }
 
 function handleSettingsFileSelection(file) {
+  if (file && file.size > 64_000) { renderSettingsTransferStatus("Settings file exceeds 64 KB.", { tone: "error" }); return; }
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
@@ -2898,6 +2387,7 @@ function handleSettingsFileSelection(file) {
 
 function recordReplayAction(action) {
   if (!replayCurrentRun || isReplayRunning()) return;
+  if (replayCurrentRun.events.length >= ReplayTools.MAX_REPLAY_EVENTS) return;
   replayCurrentRun.events.push({
     frame: simulationFrame,
     action,
@@ -2909,6 +2399,8 @@ function finalizeReplayCapture(metadata = {}) {
   replayLastRun = {
     ...replayCurrentRun,
     schemaVersion: getReplaySchemaVersion(),
+    finalFrame: simulationFrame,
+    stateHash: SimulationClock.hashState(getSimulationSnapshot()),
     endedAt: Date.now(),
     exportedAt: Date.now(),
     score,
@@ -2922,12 +2414,20 @@ function finalizeReplayCapture(metadata = {}) {
 
 function startReplayLastRun() {
   if (!replayLastRun || !Array.isArray(replayLastRun.events)) return;
+  if (replayLastRun.rulesetVersion !== ReplayTools.RULESET_VERSION) {
+    renderReplayStatus("This replay uses an older timing ruleset. Keep it for use with its original release.");
+    return;
+  }
+  replayCurrentRun = null;
 
   replayPlayback = {
     seed: replayLastRun.seed,
     challengeMode: replayLastRun.challengeMode || CHALLENGE_MODES.CLASSIC,
     events: replayLastRun.events.slice().sort((a, b) => a.frame - b.frame),
     cursor: 0,
+    finalFrame: replayLastRun.finalFrame,
+    stateHash: replayLastRun.stateHash,
+    completed: false,
   };
   settings.challengeMode = replayPlayback.challengeMode;
   persistSettings();
@@ -2935,6 +2435,22 @@ function startReplayLastRun() {
   startNewGame({ replay: true, seed: replayPlayback.seed, skipCapture: true });
   renderReplayButton();
   renderReplayStatus(`Replay started (${replayPlayback.events.length} inputs).`);
+  finishReplayIfDue(replayPlayback);
+}
+
+function finishReplayIfDue(playback) {
+  if (!playback || playback.completed || !Number.isSafeInteger(playback.finalFrame) ||
+      simulationFrame < playback.finalFrame) return;
+  playback.completed = true;
+  if (activeRunIsReplay) replayPlayback = playback;
+  playback.verified = playback.stateHash
+    ? playback.stateHash === SimulationClock.hashState(getSimulationSnapshot()) : null;
+  gameAudio.setPaused(true);
+  renderReplayButton();
+  renderStartButton();
+  playback.message = playback.verified === true ? "Replay complete. State verified." :
+    (playback.verified === false ? "Replay complete. State mismatch; this recording did not reproduce exactly." : "Replay complete. No verification hash supplied.");
+  renderReplayStatus(playback.message);
 }
 
 function applyReplayEventsForFrame() {
@@ -2947,7 +2463,7 @@ function applyReplayEventsForFrame() {
     const entry = replayPlayback.events[replayPlayback.cursor];
     replayPlayback.cursor += 1;
     if (!entry || typeof entry.action !== "string") continue;
-    handleAction(entry.action, { source: "replay", record: false });
+    applyAction(entry.action);
   }
 }
 
@@ -2983,7 +2499,7 @@ function startDailyChallenge() {
 
 function getCurrentRunDurationMs() {
   if (!Number.isFinite(runStartedAtMs) || runStartedAtMs <= 0) return 0;
-  return Math.max(0, Date.now() - runStartedAtMs);
+  return runDurationMs;
 }
 
 function finalizeRunResult(options = {}) {
@@ -3036,6 +2552,8 @@ function startNewGame(options = {}) {
     finalizeRunResult({ completed: levelsClearedThisRun > 0 });
   }
 
+  if (!options.skipCapture) finalizeReplayCapture({ reason: "new-game" });
+
   const replaySeed = options.seed;
   const requestedSeed = Number.isFinite(replaySeed) ? replaySeed : createRunSeed();
   activeRunSeed = requestedSeed;
@@ -3044,17 +2562,25 @@ function startNewGame(options = {}) {
   runResultCommitted = false;
   runStartedAtMs = Date.now();
   levelsClearedThisRun = 0;
-  musicStepIndex = 0;
-  musicLastStepAt = 0;
+  gameAudio.reset();
+  gameAudio.setPaused(false);
   setRunRandomSeed(activeRunSeed);
 
-  if (!options.skipCapture) {
-    finalizeReplayCapture({ reason: "new-game" });
-    beginReplayCapture(activeRunSeed);
-  }
+  if (!options.skipCapture) beginReplayCapture(activeRunSeed);
 
   challengeTimeRemainingMs = CHALLENGE_TIME_ATTACK_SECONDS * 1000;
   simulationFrame = 0;
+  logicalTick = 0;
+  lastUpdateNow = 0;
+  lastUserIntentAt = 0;
+  runDurationMs = 0;
+  pendingInputs = [];
+  pausedPhase = null;
+  pausedPhaseUntil = 0;
+  roundStartAt = 0;
+  pointPopups = [];
+  hudToasts = [];
+  frameScheduler.reset();
   const pacingMonitor = getFramePacingMonitor();
   if (pacingMonitor && typeof pacingMonitor.reset === "function") {
     pacingMonitor.reset();
@@ -3124,13 +2650,15 @@ function shouldHotApplyChallengeMode() {
 }
 
 function applyChallengeModeSetting(nextMode) {
+  const replacingReplay = isReplayRunning();
+  if (replacingReplay) replayPlayback = null;
   settings.challengeMode = Object.values(CHALLENGE_MODES).includes(nextMode)
     ? nextMode
     : CHALLENGE_MODES.CLASSIC;
   persistSettings();
   renderSettingsUi();
 
-  if (shouldHotApplyChallengeMode()) {
+  if (replacingReplay || shouldHotApplyChallengeMode()) {
     const keepDailyRun = activeRunIsDaily && settings.challengeMode === CHALLENGE_MODES.CLASSIC;
     startNewGame({
       seed: activeRunSeed,
@@ -3204,19 +2732,22 @@ function onGhostCollision() {
 
 function setPaused(nextPaused) {
   const shouldPause = Boolean(nextPaused);
-  if (shouldPause && phase === GAME_PHASE_PLAYING) {
+  if (shouldPause && [GAME_PHASE_READY, GAME_PHASE_PLAYING, GAME_PHASE_DYING,
+    GAME_PHASE_INTERMISSION, GAME_PHASE_CUTSCENE].includes(phase)) {
+    pausedPhase = phase;
+    pausedPhaseUntil = phaseUntil;
     setPhase(GAME_PHASE_PAUSED, {
-      message: "PAUSED",
-      forceAnnouncement: true,
-      announcementMinGapMs: 0,
+      message: "PAUSED", forceAnnouncement: true, announcementMinGapMs: 0,
     });
-    playGameSfx("ui");
+    gameAudio.setPaused(true);
   } else if (!shouldPause && phase === GAME_PHASE_PAUSED) {
-    setPhase(GAME_PHASE_PLAYING, {
-      forceAnnouncement: true,
-      announcementMinGapMs: 0,
+    setPhase(pausedPhase || GAME_PHASE_PLAYING, {
+      forceAnnouncement: true, announcementMinGapMs: 0,
     });
-    playGameSfx("ui");
+    phaseUntil = pausedPhaseUntil;
+    pausedPhase = null;
+    frameScheduler.reset();
+    gameAudio.setPaused(false);
   }
 }
 
@@ -3224,19 +2755,8 @@ function togglePaused() {
   setPaused(phase !== GAME_PHASE_PAUSED);
 }
 
-function mapDirectionNameToCode(directionName) {
-  if (directionName === "left") return DIRECTION_LEFT;
-  if (directionName === "up") return DIRECTION_UP;
-  if (directionName === "right") return DIRECTION_RIGHT;
-  if (directionName === "down") return DIRECTION_BOTTOM;
-  return null;
-}
-
 function setPacmanDirection(nextDirection) {
   if (!pacman) return;
-  if (phase === GAME_PHASE_PAUSED) {
-    setPaused(false);
-  }
   if (phase !== GAME_PHASE_PLAYING && phase !== GAME_PHASE_READY) {
     return;
   }
@@ -3289,18 +2809,26 @@ function bindKey(action, rawKey) {
 }
 
 function handleAction(action, options = {}) {
-  const source = options.source || "user";
-  const shouldRecord = options.record !== false && source !== "replay";
-  const isUserAction = source !== "replay";
-
-  if (isUserAction) {
+  if (options.source !== "replay") {
+    if (isReplayRunning() && !attractModeActive) {
+      const finished = replayPlayback.completed;
+      replayPlayback = null;
+      gameAudio.setPaused(phase === GAME_PHASE_PAUSED);
+      renderReplayButton();
+      addHudToast("Replay canceled", getCurrentPalette().textMode, 900);
+      if (finished && action === "start") { startNewGame(); return; }
+    }
     noteUserIntent();
   }
-
-  if (shouldRecord) {
-    recordReplayAction(action);
+  if (["left", "up", "right", "down", "pause"].includes(action) ||
+      (action === "start" && ![GAME_PHASE_START, GAME_PHASE_GAMEOVER].includes(phase))) {
+    pendingInputs.push(action);
+    return;
   }
+  applyAction(action);
+}
 
+function applyAction(action) {
   if (phase === GAME_PHASE_CUTSCENE && action === "start") {
     skipCutscene();
     return;
@@ -3542,7 +3070,7 @@ function pollGamepadInput() {
   const down = buttonPressed(13) || axisY > 0.45;
 
   if (left || right || up || down) {
-    if (Math.abs(axisX) > Math.abs(axisY)) {
+    if ((left || right) && (!(up || down) || Math.abs(axisX) > Math.abs(axisY))) {
       if (left) handleAction("left", { source: "gamepad" });
       if (right) handleAction("right", { source: "gamepad" });
     } else {
@@ -3653,12 +3181,10 @@ function updatePhaseTransitions() {
         syncHighScore();
       }
       finalizeRunResult({ completed: levelsClearedThisRun > 0 });
+      setPhase(GAME_PHASE_GAMEOVER, { message: "Press Start or your start key" });
       finalizeReplayCapture({ reason: "game-over" });
       replayPlayback = null;
       renderReplayButton();
-      setPhase(GAME_PHASE_GAMEOVER, {
-        message: "Press Start or your start key",
-      });
       return;
     }
 
@@ -3699,6 +3225,8 @@ function updateGameplay() {
     previousGhostRects[i] = snapshotCollisionRect(ghosts[i]);
   }
 
+  if (!isGhostFrightened()) ghostModeElapsedMs += FRAME_STEP_MS;
+  pacman.advanceAnimation(FRAME_STEP_MS);
   pacman.moveProcess();
   const eatResult = pacman.eat();
 
@@ -3745,6 +3273,8 @@ function updateGameplay() {
 }
 
 function update() {
+  if (replayPlayback?.completed) return;
+  const playbackAtStart = replayPlayback;
   const stepDebugEnabled = settings.simDebugEnabled;
   const stepDebugPaused = stepDebugEnabled && settings.simPaused;
   if (stepDebugPaused && simStepRequests <= 0) {
@@ -3754,10 +3284,19 @@ function update() {
     simStepRequests -= 1;
   }
 
-  simulationFrame += 1;
-  maybeBeginAttractMode();
-  applyReplayEventsForFrame();
   pollGamepadInput();
+  simulationFrame += 1;
+  applyReplayEventsForFrame();
+  const inputs = pendingInputs;
+  pendingInputs = [];
+  for (const action of inputs) {
+    recordReplayAction(action);
+    applyAction(action);
+  }
+  if (phase === GAME_PHASE_PAUSED) { finishReplayIfDue(playbackAtStart); return; }
+  logicalTick += 1;
+  lastUpdateNow = logicalTick * FRAME_STEP_MS;
+  maybeBeginAttractMode();
   updatePhaseTransitions();
   updatePopups();
   updateBackgroundMusic();
@@ -3768,13 +3307,17 @@ function update() {
     if (challengeTimeRemainingMs <= 0) {
       lives = 0;
       onGhostCollision();
+      finishReplayIfDue(playbackAtStart);
       return;
     }
   }
 
   if (phase === GAME_PHASE_PLAYING) {
+    runDurationMs += FRAME_STEP_MS;
     updateGameplay();
   }
+
+  finishReplayIfDue(playbackAtStart);
 
   if (stepDebugEnabled && simulationFrame % 8 === 0) {
     renderSimDebugStatus();
@@ -3782,64 +3325,7 @@ function update() {
 }
 
 function drawWalls() {
-  const palette = getCurrentPalette();
-  for (let i = 0; i < wallTiles.length; i++) {
-    const tile = wallTiles[i];
-    const x = tile.x;
-    const y = tile.y;
-
-    createRect(
-      x * oneBlockSize,
-      y * oneBlockSize,
-      oneBlockSize,
-      oneBlockSize,
-      palette.wallOuter
-    );
-
-    const wallSpaceWidth = oneBlockSize / 1.6;
-    const wallOffset = (oneBlockSize - wallSpaceWidth) / 2;
-    const wallInnerColor = palette.wallInner;
-
-    if (x > 0 && map[y][x - 1] === 1) {
-      createRect(
-        x * oneBlockSize,
-        y * oneBlockSize + wallOffset,
-        wallSpaceWidth + wallOffset,
-        wallSpaceWidth,
-        wallInnerColor
-      );
-    }
-
-    if (x < map[0].length - 1 && map[y][x + 1] === 1) {
-      createRect(
-        x * oneBlockSize + wallOffset,
-        y * oneBlockSize + wallOffset,
-        wallSpaceWidth + wallOffset,
-        wallSpaceWidth,
-        wallInnerColor
-      );
-    }
-
-    if (y < map.length - 1 && map[y + 1][x] === 1) {
-      createRect(
-        x * oneBlockSize + wallOffset,
-        y * oneBlockSize + wallOffset,
-        wallSpaceWidth,
-        wallSpaceWidth + wallOffset,
-        wallInnerColor
-      );
-    }
-
-    if (y > 0 && map[y - 1][x] === 1) {
-      createRect(
-        x * oneBlockSize + wallOffset,
-        y * oneBlockSize,
-        wallSpaceWidth,
-        wallSpaceWidth + wallOffset,
-        wallInnerColor
-      );
-    }
-  }
+  mazeRenderer.draw(map, getCurrentPalette(), oneBlockSize, dpr * renderScale);
 }
 
 function drawFoods() {
@@ -4005,82 +3491,21 @@ function drawPacman() {
   pacman.draw();
 }
 
-function drawRemainingLives() {
-  const palette = getCurrentPalette();
-  const hudScale = settings.largeHud ? 1.18 : 1;
-  canvasContext.font = `${Math.round(20 * hudScale)}px Emulogic`;
-  canvasContext.fillStyle = palette.textPrimary;
-  canvasContext.fillText("Lives:", logicalW - 190, oneBlockSize * (map.length + 1));
-
-  for (let i = 0; i < lives; i++) {
-    canvasContext.drawImage(
-      pacmanFrames,
-      2 * oneBlockSize,
-      0,
-      oneBlockSize,
-      oneBlockSize,
-      logicalW - 120 + i * oneBlockSize,
-      oneBlockSize * map.length + 2,
-      oneBlockSize,
-      oneBlockSize
-    );
-  }
-}
-
 function drawScoreHud() {
-  const palette = getCurrentPalette();
-  const hudScale = settings.largeHud ? 1.18 : 1;
-  const hudY = oneBlockSize * (map.length + 1);
-  const hudY2 = oneBlockSize * (map.length + 1.8);
-
-  canvasContext.font = `${Math.round(20 * hudScale)}px Emulogic`;
-  canvasContext.fillStyle = palette.textPrimary;
-  canvasContext.fillText(`Score: ${score}`, 0, hudY);
-
-  canvasContext.font = `${Math.round(16 * hudScale)}px Emulogic`;
-  canvasContext.fillStyle = palette.textHigh;
-  canvasContext.fillText(`High: ${highScore}`, 0, hudY2);
-
-  canvasContext.fillStyle = palette.textAccent;
-  canvasContext.fillText(`Level: ${level}`, 220, hudY);
-
-  canvasContext.fillStyle = palette.textMode;
-  canvasContext.fillText(`Mode: ${getCurrentGhostModeLabel()}`, 220, hudY2);
-
-  canvasContext.fillStyle = palette.textFruit;
-  canvasContext.fillText(`Fruit: ${fruit.spec.name}`, 390, hudY2);
-
-  if (isGhostFrightened()) {
-    const remainingMs = Math.max(0, frightenedUntil - lastUpdateNow);
-    const seconds = Math.ceil(remainingMs / 1000);
-    canvasContext.fillStyle = palette.textMode;
-    canvasContext.fillText(`Fright: ${seconds}s`, 390, hudY);
-  }
-
-  if (settings.challengeMode === CHALLENGE_MODES.TIME_ATTACK) {
-    const timeLeft = Math.max(0, Math.ceil(challengeTimeRemainingMs / 1000));
-    canvasContext.fillStyle = palette.textHigh;
-    canvasContext.fillText(`Time: ${timeLeft}s`, 560, hudY);
-  } else if (settings.challengeMode !== CHALLENGE_MODES.CLASSIC) {
-    canvasContext.fillStyle = palette.textHigh;
-    canvasContext.fillText(`Challenge: ${settings.challengeMode}`, 560, hudY);
-  }
-
-  if (attractModeActive) {
-    canvasContext.fillStyle = palette.textMode;
-    canvasContext.fillText("DEMO", 560, hudY2);
-  }
-
-  if (isReplayRunning()) {
-    canvasContext.fillStyle = palette.textMode;
-    canvasContext.fillText("REPLAY", 690, hudY2);
-  }
-
-  if (settings.simDebugEnabled) {
-    canvasContext.fillStyle = palette.textAccent;
-    canvasContext.fillText(`Seed: ${activeRunSeed}`, 560, hudY2 + oneBlockSize * 0.8);
-    canvasContext.fillText(`Frame: ${simulationFrame}`, 760, hudY2 + oneBlockSize * 0.8);
-  }
+  if (!hud) return;
+  const phaseLabels = { start: "Ready to play", ready: "Get ready", playing: "In play",
+    paused: "Paused", dying: "Life lost", intermission: "Stage clear", cutscene: "Intermission", gameover: "Game over" };
+  const challengeLabels = { classic: "Remix", "time-attack": "Time attack", "no-power": "No power", "one-life": "One life" };
+  const status = [];
+  if (settings.challengeMode === CHALLENGE_MODES.TIME_ATTACK) status.push(`${Math.ceil(challengeTimeRemainingMs / 1000)}s left`);
+  if (isGhostFrightened()) status.push(`Power ${Math.ceil((frightenedUntil - lastUpdateNow) / 1000)}s`);
+  if (attractModeActive) status.push("Demo");
+  else if (isReplayRunning()) status.push(replayPlayback.completed ? "Replay complete" : "Replay");
+  status.push(`${remainingFoodCount} pellets`);
+  hud.render({ score, best: highScore, level, lives, phase: phaseLabels[phase],
+    mode: challengeLabels[settings.challengeMode], status: status.join(" · "),
+    notice: hudToasts.length ? hudToasts[hudToasts.length - 1].text : "",
+    seed: `Seed ${activeRunSeed}`, ghost: getCurrentGhostModeLabel().toLowerCase() });
 }
 
 function drawPointPopups() {
@@ -4089,7 +3514,7 @@ function drawPointPopups() {
     const life = (popup.expiresAt - lastUpdateNow) / (popup.expiresAt - popup.createdAt);
     const yOffset = settings.reducedMotion ? 0 : (1 - life) * oneBlockSize;
 
-    canvasContext.font = "14px Emulogic";
+    canvasContext.font = "14px monospace";
     canvasContext.fillStyle = popup.color;
     canvasContext.globalAlpha = Math.max(0, Math.min(1, life));
     canvasContext.fillText(popup.text, popup.x, popup.y - yOffset);
@@ -4097,41 +3522,44 @@ function drawPointPopups() {
   }
 }
 
-function drawHudToasts() {
-  for (let i = 0; i < hudToasts.length; i++) {
-    const toast = hudToasts[i];
-    const life = (toast.expiresAt - lastUpdateNow) / (toast.expiresAt - toast.createdAt);
-    canvasContext.font = "14px Emulogic";
-    canvasContext.fillStyle = toast.color;
-    canvasContext.globalAlpha = Math.max(0, Math.min(1, life));
-    canvasContext.fillText(toast.text, logicalW / 2 - 50, oneBlockSize * (map.length + 1));
-    canvasContext.globalAlpha = 1;
-  }
-}
-
 function drawOverlay(title, subtitle) {
   const palette = getCurrentPalette();
-  canvasContext.fillStyle = "rgba(0, 0, 0, 0.58)";
-  canvasContext.fillRect(0, 0, logicalW, logicalH);
-
-  canvasContext.textAlign = "center";
-  canvasContext.font = "24px Emulogic";
-  canvasContext.fillStyle = palette.overlayTitle;
-  canvasContext.fillText(title, logicalW / 2, logicalH / 2 - 12);
-
-  if (subtitle) {
-    canvasContext.font = "12px Emulogic";
-    canvasContext.fillStyle = palette.overlaySubtitle;
-    canvasContext.fillText(subtitle, logicalW / 2, logicalH / 2 + oneBlockSize);
+  const unit = 1 / renderScale;
+  const panelWidth = Math.min(380 * unit, logicalW - 32 * unit);
+  canvasContext.font = `${13 * unit}px monospace`;
+  const lines = [];
+  let line = "";
+  for (const word of String(subtitle || "").split(" ")) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (line && canvasContext.measureText(candidate).width > panelWidth - 36 * unit) {
+      lines.push(line);
+      line = word;
+    } else line = candidate;
   }
-
+  if (line) lines.push(line);
+  const panelHeight = (76 + lines.length * 18) * unit;
+  const top = (logicalH - panelHeight) / 2;
+  canvasContext.fillStyle = "rgba(0, 0, 0, 0.40)";
+  canvasContext.fillRect(0, 0, logicalW, logicalH);
+  canvasContext.fillStyle = "rgba(5, 10, 18, 0.96)";
+  canvasContext.fillRect((logicalW - panelWidth) / 2, top, panelWidth, panelHeight);
+  canvasContext.strokeStyle = "#374650";
+  canvasContext.lineWidth = unit;
+  canvasContext.strokeRect((logicalW - panelWidth) / 2, top, panelWidth, panelHeight);
+  canvasContext.textAlign = "center";
+  canvasContext.font = `${22 * unit}px Bungee, monospace`;
+  canvasContext.fillStyle = palette.overlayTitle;
+  canvasContext.fillText(title, logicalW / 2, top + 36 * unit, panelWidth - 24 * unit);
+  canvasContext.font = `${13 * unit}px monospace`;
+  canvasContext.fillStyle = palette.overlaySubtitle;
+  lines.forEach((text, index) => canvasContext.fillText(text, logicalW / 2, top + (64 + index * 18) * unit));
   canvasContext.textAlign = "start";
 }
 
 function drawReadyMessage() {
   const palette = getCurrentPalette();
   canvasContext.textAlign = "center";
-  canvasContext.font = "22px Emulogic";
+  canvasContext.font = `${Math.max(24, 20 / renderScale)}px Bungee, monospace`;
   canvasContext.fillStyle = palette.overlayTitle;
   canvasContext.fillText("READY!", logicalW / 2, logicalH / 2);
   canvasContext.textAlign = "start";
@@ -4155,12 +3583,12 @@ function drawCutscene() {
 
   canvasContext.textAlign = "center";
   canvasContext.fillStyle = accent;
-  canvasContext.font = "24px Emulogic";
+  canvasContext.font = `${Math.max(28, 20 / renderScale)}px Bungee, monospace`;
   canvasContext.fillText(activeCutscene.title, logicalW / 2, logicalH * 0.36);
 
   canvasContext.fillStyle = palette.overlaySubtitle;
-  canvasContext.font = "12px Emulogic";
-  canvasContext.fillText(activeCutscene.subtitle, logicalW / 2, logicalH * 0.44);
+  canvasContext.font = `${Math.max(12, 12 / renderScale)}px monospace`;
+  canvasContext.fillText(activeCutscene.subtitle, logicalW / 2, logicalH * 0.44, logicalW - 32 / renderScale);
   canvasContext.fillText("Press Start to skip", logicalW / 2, logicalH * 0.52);
 
   const laneY = logicalH * 0.68;
@@ -4181,6 +3609,10 @@ function drawCutscene() {
 }
 
 function drawPhaseOverlay() {
+  if (replayPlayback?.completed) {
+    drawOverlay("REPLAY COMPLETE", replayPlayback.verified === true ? "State verified · Replay again or start a new game" : replayPlayback.message);
+    return;
+  }
   if (phase === GAME_PHASE_CUTSCENE) {
     drawCutscene();
     return;
@@ -4232,29 +3664,30 @@ function draw() {
   drawPacman();
   drawPointPopups();
   drawScoreHud();
-  drawRemainingLives();
-  drawHudToasts();
   drawPhaseOverlay();
 }
 
 function gameLoop(now) {
-  if (!lastUpdateNow) lastUpdateNow = now;
-  const delta = Math.min(100, now - lastUpdateNow);
-  lastUpdateNow = now;
-
-  const pacingMonitor = getFramePacingMonitor();
-  if (pacingMonitor && typeof pacingMonitor.push === "function") {
-    framePacingSnapshot = pacingMonitor.push(delta, now);
+  if (!manualStepping && !document.hidden) {
+    if (previousRenderNow !== null) {
+      const pacingMonitor = getFramePacingMonitor();
+      if (pacingMonitor) framePacingSnapshot = pacingMonitor.push(now - previousRenderNow, now);
+    }
+    previousRenderNow = now;
+    frameScheduler.advance(now);
   }
-
-  frameAccumulator += delta;
-  while (frameAccumulator >= FRAME_STEP_MS) {
-    update();
-    frameAccumulator -= FRAME_STEP_MS;
-  }
-
   draw();
   animationFrameId = window.requestAnimationFrame(gameLoop);
+}
+
+function pauseForFocusLoss() {
+  clearSwipeState();
+  if (stickPointerId !== null) onStickPointerUp({ pointerId: stickPointerId });
+  if (replayPlayback?.completed) return;
+  if ([GAME_PHASE_START, GAME_PHASE_GAMEOVER, GAME_PHASE_PAUSED].includes(phase)) return;
+  if (!pendingInputs.includes("pause")) handleAction("pause");
+  update();
+  draw();
 }
 
 function wireUiEvents() {
@@ -4581,6 +4014,11 @@ function wireUiEvents() {
 
   window.addEventListener("keydown", (event) => {
     const normalizedKey = normalizeKeyName(event.key);
+    const target = event.target;
+    if (!pendingRebindAction && target instanceof Element) {
+      if (target.closest("input, select, textarea, [contenteditable=true]")) return;
+      if (target.closest("button, summary, a") && ["enter", " "].includes(normalizedKey)) return;
+    }
     primeAudioContext();
     if (!pendingRebindAction) {
       noteUserIntent();
@@ -4608,6 +4046,16 @@ function wireUiEvents() {
     handleAction(action);
   });
 
+  document.addEventListener("visibilitychange", () => {
+    frameScheduler.reset();
+    previousRenderNow = null;
+    if (document.hidden) pauseForFocusLoss();
+  });
+
+  window.addEventListener("blur", () => {
+    pauseForFocusLoss();
+  });
+
   window.addEventListener("resize", () => {
     updateMobileInputPresentation();
     renderArcadeViewButton();
@@ -4631,6 +4079,7 @@ function wireUiEvents() {
       animationFrameId = null;
     }
     disposeActors();
+    gameAudio.dispose();
   });
 }
 
@@ -4673,6 +4122,10 @@ function renderGameToText() {
     coordinateSystem: "origin=(0,0) top-left, +x right, +y down, units=pixels",
     phase,
     frame: simulationFrame,
+    simulationTimeMs: lastUpdateNow,
+    frightenedRemainingMs: Math.max(0, frightenedUntil - lastUpdateNow),
+    remainingFood: remainingFoodCount,
+    challengeTimeRemainingMs,
     score,
     lives,
     level,
@@ -4701,28 +4154,46 @@ function renderGameToText() {
 }
 
 function stepDeterministicFrames(frameCount) {
-  const steps = Math.max(1, Number.parseInt(frameCount, 10) || 1);
-  const pacingMonitor = getFramePacingMonitor();
-  for (let i = 0; i < steps; i++) {
-    lastUpdateNow += FRAME_STEP_MS;
-    if (pacingMonitor && typeof pacingMonitor.push === "function") {
-      framePacingSnapshot = pacingMonitor.push(FRAME_STEP_MS, lastUpdateNow);
-    }
-    update();
-  }
+  manualStepping = true;
+  frameScheduler.reset();
+  const steps = Math.max(0, Math.min(36000, Math.floor(Number(frameCount) || 0)));
+  for (let i = 0; i < steps; i++) update();
   draw();
+}
+
+function getSimulationSnapshot() {
+  const actor = (value) => value ? {
+    x: value.x, y: value.y, direction: value.direction, nextDirection: value.nextDirection,
+    state: value.state, house: value.houseState, speed: value.speed,
+    frightenedTurnsRemaining: value.frightenedTurnsRemaining,
+    randomTargetIndex: value.randomTargetIndex,
+  } : null;
+  return {
+    frame: simulationFrame, time: lastUpdateNow, phase, phaseUntil, pausedPhase, pausedPhaseUntil,
+    mode: settings.challengeMode, seed: activeRunSeed, randomState: runRandomState,
+    map, score, lives, level, nextBonusLifeScore, remainingFoodCount, dotsEatenThisRound,
+    roundStartAt, frightenedUntil, ghostEatChain, ghostGlobalMode, ghostModeElapsedMs,
+    challengeTimeRemainingMs, runDurationMs, fruit, activeCutscene,
+    pacman: actor(pacman), ghosts: ghosts.map(actor), randomTargetsForGhosts,
+  };
 }
 
 function exposeDiagnosticsApi() {
   window.render_game_to_text = renderGameToText;
   window.advanceTime = (ms) => {
-    const durationMs = Math.max(FRAME_STEP_MS, Number(ms) || FRAME_STEP_MS);
-    const steps = Math.max(1, Math.round(durationMs / FRAME_STEP_MS));
+    const durationMs = Math.max(0, Math.min(600000, Number(ms) || 0));
+    const steps = Math.round(durationMs / FRAME_STEP_MS);
     stepDeterministicFrames(steps);
   };
 
   window.__PACMAN_DIAGNOSTICS__ = {
     getFramePacingSnapshot: getFramePacingSnapshotForApi,
+    getStateHash: () => SimulationClock.hashState(getSimulationSnapshot()),
+    getSimulationSnapshot: () => cloneSerializable(getSimulationSnapshot()),
+    exportReplay: () => cloneSerializable(replayCurrentRun ? { ...replayCurrentRun, finalFrame: simulationFrame, stateHash: SimulationClock.hashState(getSimulationSnapshot()) } : replayLastRun),
+    importReplay: importReplayPayload,
+    startReplay: startReplayLastRun,
+    resumeRealtime: () => { manualStepping = false; previousRenderNow = null; frameScheduler.reset(); },
     getFramePacingBudget: () => cloneSerializable(PERF_GUARDRAIL_CONFIG, PERF_GUARDRAIL_CONFIG),
     exportSettingsSnapshot: () => createSettingsTransferPayload(),
     importSettingsSnapshot: (payload) => importSettingsPayload(payload),

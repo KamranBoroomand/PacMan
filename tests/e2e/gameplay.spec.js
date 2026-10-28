@@ -1,4 +1,4 @@
-const { test, expect } = require("@playwright/test");
+const { test, expect } = require("./fixtures");
 
 async function getCurrentPhase(page) {
   return page.evaluate(() => {
@@ -24,11 +24,11 @@ async function waitForPhase(page, expectedPhase, timeout = 7000) {
 }
 
 async function startAndWaitForPlaying(page) {
+  await page.waitForFunction(() => typeof window.advanceTime === "function");
   await page.locator("#start-game").click();
   await page.evaluate(() => {
-    if (typeof window.advanceTime === "function") {
-      window.advanceTime(2200);
-    }
+    window.advanceTime(2200);
+    window.__PACMAN_DIAGNOSTICS__.resumeRealtime();
   });
   await waitForPhase(page, "playing");
 }

@@ -8,14 +8,10 @@
       return storage;
     }
 
-    if (
-      globalScope &&
-      globalScope.localStorage &&
-      typeof globalScope.localStorage.getItem === "function" &&
-      typeof globalScope.localStorage.setItem === "function"
-    ) {
-      return globalScope.localStorage;
-    }
+    try {
+      const fallback = globalScope && globalScope.localStorage;
+      if (fallback && typeof fallback.getItem === "function" && typeof fallback.setItem === "function") return fallback;
+    } catch { return null; }
 
     return null;
   }
@@ -123,7 +119,7 @@
       }
 
       const history = Array.isArray(parsed.history)
-        ? parsed.history.slice(-Math.max(1, toSafeInteger(maxHistory, 30)))
+        ? parsed.history.filter((entry) => entry && typeof entry === "object" && typeof entry.date === "string").slice(-Math.max(1, toSafeInteger(maxHistory, 30)))
         : [];
 
       return {
@@ -163,10 +159,24 @@
       const raw = resolvedStorage.getItem(key);
       if (!raw) return { entries: {} };
       const parsed = parseJson(raw, {});
-      const entries =
-        parsed && typeof parsed.entries === "object" && parsed.entries
-          ? parsed.entries
-          : {};
+      const entries = {};
+      const incoming = parsed && parsed.entries;
+      if (incoming && typeof incoming === "object" && !Array.isArray(incoming)) {
+        for (const entry of Object.values(incoming)) {
+          if (!entry || typeof entry !== "object" ||
+              !["classic", "time-attack", "no-power", "one-life"].includes(entry.mode) ||
+              !Number.isSafeInteger(Number(entry.seed))) continue;
+          const safe = {
+            mode: entry.mode, seed: Number(entry.seed),
+            bestScore: Math.max(0, toSafeInteger(entry.bestScore)),
+            bestTimeMs: Number.isFinite(Number(entry.bestTimeMs)) && Number(entry.bestTimeMs) > 0 ? Number(entry.bestTimeMs) : Infinity,
+            runs: Math.max(0, toSafeInteger(entry.runs)),
+            completedRuns: Math.max(0, toSafeInteger(entry.completedRuns)),
+            lastPlayed: typeof entry.lastPlayed === "string" ? entry.lastPlayed : "",
+          };
+          entries[`${safe.mode}:${safe.seed}`] = safe;
+        }
+      }
       return { entries };
     } catch (error) {
       return { entries: {} };

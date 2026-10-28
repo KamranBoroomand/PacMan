@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       run_visual:
-        description: "Run visual Playwright snapshots"
+        description: "Capture visual review images"
         required: false
         type: boolean
         default: false
@@ -27,7 +27,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -42,7 +42,7 @@ jobs:
       - name: E2E tests (desktop + mobile matrix)
         run: npm run test:e2e
 
-      - name: Visual snapshot tests
+      - name: Visual review captures
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_visual }}
         run: PLAYWRIGHT_VISUAL=1 npm run test:e2e -- --project=desktop-chromium
 
@@ -87,13 +87,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Bundle static site
-        run: |
-          mkdir -p site-dist
-          cp -R index.html css scripts images manifest.webmanifest service-worker.js CNAME LICENSE README.md site-dist/
+        run: npm run build
 
       - name: Upload site artifact
         uses: actions/upload-artifact@v4
         with:
           name: pacman-site
-          path: site-dist
+          path: dist

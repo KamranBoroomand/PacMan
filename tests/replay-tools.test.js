@@ -30,7 +30,7 @@ test("sanitizeReplayPayload normalizes payload shape", () => {
     }
   );
 
-  assert.equal(sanitized.schemaVersion, 2);
+  assert.equal(sanitized.schemaVersion, 3);
   assert.equal(sanitized.seed, 142);
   assert.equal(sanitized.challengeMode, "time-attack");
   assert.deepEqual(sanitized.events, [
@@ -60,7 +60,7 @@ test("encodeReplayToString and decodeReplayFromString round-trip", () => {
     nowMs: () => 1,
   });
 
-  assert.equal(decoded.schemaVersion, 2);
+  assert.equal(decoded.schemaVersion, 3);
   assert.equal(decoded.seed, 9);
   assert.equal(decoded.challengeMode, "classic");
   assert.deepEqual(decoded.events, [{ frame: 1, action: "start" }]);
@@ -89,7 +89,7 @@ test("sanitizeReplayPayload migrates legacy v1 payload shape", () => {
     }
   );
 
-  assert.equal(sanitized.schemaVersion, 2);
+  assert.equal(sanitized.schemaVersion, 3);
   assert.equal(sanitized.seed, 77);
   assert.equal(sanitized.challengeMode, "time-attack");
   assert.deepEqual(sanitized.events, [
@@ -109,4 +109,15 @@ test("parseReplayFromHash returns null for unrelated hashes", () => {
   });
 
   assert.equal(parsed, null);
+});
+
+test("current replay rulesets reject unknown actions and unbounded imports", () => {
+  const payload = { schemaVersion: 3, rulesetVersion: replayTools.RULESET_VERSION, seed: 1, events: [] };
+  assert.ok(replayTools.sanitizeReplayPayload(payload));
+  assert.equal(replayTools.sanitizeReplayPayload({ ...payload, rulesetVersion: "unknown" }), null);
+  assert.equal(replayTools.sanitizeReplayPayload({ ...payload, schemaVersion: 99 }), null);
+  assert.equal(replayTools.sanitizeReplayPayload({ ...payload, events: [{frame: 1, action: "restart"}] }), null);
+  assert.equal(replayTools.sanitizeReplayPayload({ ...payload, events: [{frame: 1e12, action: "left"}] }), null);
+  assert.equal(replayTools.sanitizeReplayPayload({ ...payload, events: Array(50001).fill([1,"left"]) }), null);
+  assert.equal(replayTools.decodeReplayFromString("a".repeat(2700001)), null);
 });

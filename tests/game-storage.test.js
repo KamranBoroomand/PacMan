@@ -77,3 +77,25 @@ test("getTodayKey returns YYYY-MM-DD", () => {
   const key = gameStorage.getTodayKey(new Date("2026-02-11T12:30:00Z"));
   assert.equal(key, "2026-02-11");
 });
+
+test("corrupt leaderboard entries are discarded and old score fields survive", () => {
+  const storage = createMockStorage({ board: JSON.stringify({entries: {
+    invalid: null,
+    valid: {mode: "classic", seed: 777, bestScore: 42, bestTimeMs: null, runs: 2},
+    malformed: {mode: "unknown", seed: 1},
+  }}) });
+  const board = gameStorage.loadLeaderboardState({storage, key: "board"});
+  assert.deepEqual(Object.keys(board.entries), ["classic:777"]);
+  assert.equal(board.entries["classic:777"].bestScore, 42);
+  assert.equal(board.entries["classic:777"].bestTimeMs, Infinity);
+});
+
+test("unavailable storage getters and quota failures keep the game usable", () => {
+  Object.defineProperty(globalThis, "localStorage", {configurable: true, get() {throw new Error("denied");}});
+  try {
+    assert.equal(gameStorage.readHighScore({key: "high"}), 0);
+    assert.equal(gameStorage.persistSettings({key: "settings", settings: {}}), false);
+  } finally { delete globalThis.localStorage; }
+  const broken = {getItem() {throw new Error("denied");}, setItem() {throw new Error("quota");}};
+  assert.equal(gameStorage.persistHighScore({storage: broken, key: "high", highScore: 2}), false);
+});

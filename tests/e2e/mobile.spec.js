@@ -1,7 +1,8 @@
-const { test, expect } = require("@playwright/test");
+const { test, expect } = require("./fixtures");
+
+test.skip(({ isMobile }) => !isMobile, "Touch-only coverage on the mobile profile.");
 
 test("mobile profile exposes touch controls and stick mode toggle", async ({ page }, testInfo) => {
-  test.skip(!testInfo.project.use.isMobile, "Mobile-only coverage.");
 
   await page.goto("/");
 

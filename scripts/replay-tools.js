@@ -1,5 +1,9 @@
 (function initReplayTools(globalScope) {
-  const REPLAY_SCHEMA_VERSION = 2;
+  const REPLAY_SCHEMA_VERSION = 3;
+  const RULESET_VERSION = "remix-2026-10";
+  const MAX_REPLAY_EVENTS = 50000;
+  const MAX_REPLAY_FRAMES = 216000;
+  const REPLAY_ACTIONS = new Set(["left", "up", "right", "down", "pause", "start"]);
   const LEGACY_SCHEMA_VERSION = 1;
 
   function safeNow(nowFn) {
@@ -75,11 +79,11 @@
     }
 
     const normalizedFrame = Math.max(0, Math.floor(Number(frame)));
-    if (!Number.isFinite(normalizedFrame)) return null;
+    if (!Number.isSafeInteger(normalizedFrame) || normalizedFrame > MAX_REPLAY_FRAMES) return null;
     if (typeof action !== "string") return null;
 
     const normalizedAction = action.trim().toLowerCase();
-    if (!normalizedAction) return null;
+    if (!REPLAY_ACTIONS.has(normalizedAction)) return null;
 
     return {
       frame: normalizedFrame,
@@ -122,6 +126,9 @@
 
     const migratedPayload = {
       schemaVersion: REPLAY_SCHEMA_VERSION,
+      rulesetVersion: payload.rulesetVersion || `legacy-v${sourceSchemaVersion}`,
+      finalFrame: payload.finalFrame,
+      stateHash: payload.stateHash,
       seed: payload.seed ?? payload.runSeed,
       challengeMode: payload.challengeMode ?? payload.mode ?? payload.challenge,
       events: payload.events ?? payload.inputs ?? payload.actions ?? [],
@@ -144,6 +151,10 @@
     if (!migrationResult || !migrationResult.migratedPayload) return null;
 
     const migratedPayload = migrationResult.migratedPayload;
+    if (!Array.isArray(migratedPayload.events) || migratedPayload.events.length > MAX_REPLAY_EVENTS) return null;
+    if (migrationResult.sourceSchemaVersion === REPLAY_SCHEMA_VERSION &&
+        (migratedPayload.rulesetVersion !== RULESET_VERSION ||
+         migratedPayload.events.some((event) => !normalizeReplayEvent(event)))) return null;
 
     const hashSeed =
       typeof options.hashSeed === "function"
@@ -163,6 +174,7 @@
 
     const sanitized = {
       schemaVersion: REPLAY_SCHEMA_VERSION,
+      rulesetVersion: migratedPayload.rulesetVersion || `legacy-v${migrationResult.sourceSchemaVersion}`,
       seed,
       challengeMode,
       events,
@@ -179,6 +191,10 @@
         ? Number(migratedPayload.level)
         : 1,
     };
+
+    if (Number.isSafeInteger(migratedPayload.finalFrame) && migratedPayload.finalFrame >= 0 &&
+        migratedPayload.finalFrame <= MAX_REPLAY_FRAMES) sanitized.finalFrame = migratedPayload.finalFrame;
+    if (/^[a-f0-9]{8}$/.test(migratedPayload.stateHash)) sanitized.stateHash = migratedPayload.stateHash;
 
     if (typeof migratedPayload.reason === "string" && migratedPayload.reason.length > 0) {
       sanitized.reason = migratedPayload.reason;
@@ -197,7 +213,9 @@
 
   function encodeReplayToString(replayData) {
     try {
-      return encodeUtf8ToBase64(JSON.stringify(replayData));
+      const json = JSON.stringify(replayData);
+      if (json.length > 2_000_000) return "";
+      return encodeUtf8ToBase64(json);
     } catch (error) {
       return "";
     }
@@ -205,6 +223,7 @@
 
   function decodeReplayFromString(encoded, options = {}) {
     try {
+      if (typeof encoded !== "string" || encoded.length > 2_700_000) return null;
       const json = decodeBase64ToUtf8(encoded);
       const parsed = JSON.parse(json);
       return sanitizeReplayPayload(parsed, options);
@@ -246,6 +265,8 @@
 
   const api = {
     REPLAY_SCHEMA_VERSION,
+    RULESET_VERSION,
+    MAX_REPLAY_EVENTS,
     createReplayCodec,
     decodeReplayFromString,
     encodeReplayToString,

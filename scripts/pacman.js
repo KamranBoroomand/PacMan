@@ -9,15 +9,16 @@ class Pacman {
         this.nextDirection = 4;
         this.frameCount = 7;
         this.currentFrame = 1;
-        this.animationTimer = setInterval(() => {
-            this.changeAnimation();
-        }, 100);
+        this.animationElapsedMs = 0;
     }
 
-    dispose() {
-        if (this.animationTimer) {
-            clearInterval(this.animationTimer);
-            this.animationTimer = null;
+    dispose() {}
+
+    advanceAnimation(ms) {
+        this.animationElapsedMs += ms;
+        if (this.animationElapsedMs >= 100) {
+            this.animationElapsedMs -= 100;
+            this.changeAnimation();
         }
     }
 
@@ -195,6 +196,8 @@ class Pacman {
     changeDirectionIfPossible() {
         if (this.direction == this.nextDirection) return;
 
+        const originalX = this.x;
+        const originalY = this.y;
         const isHorizontal = (direction) =>
             direction === DIRECTION_LEFT || direction === DIRECTION_RIGHT;
         const currentHorizontal = isHorizontal(this.direction);
@@ -218,6 +221,8 @@ class Pacman {
         if (this.checkCollisions()) {
             this.moveBackwards();
             this.direction = tempDirection;
+            this.x = originalX;
+            this.y = originalY;
         } else {
             this.moveBackwards();
         }
@@ -262,27 +267,6 @@ class Pacman {
     }
 
     draw() {
-        canvasContext.save();
-        canvasContext.translate(
-            this.x + oneBlockSize / 2,
-            this.y + oneBlockSize / 2
-        );
-        canvasContext.rotate((this.direction * 90 * Math.PI) / 180);
-        canvasContext.translate(
-            -this.x - oneBlockSize / 2,
-            -this.y - oneBlockSize / 2
-        );
-        canvasContext.drawImage(
-            pacmanFrames,
-            (this.currentFrame - 1) * oneBlockSize,
-            0,
-            oneBlockSize,
-            oneBlockSize,
-            this.x,
-            this.y,
-            this.width,
-            this.height
-        );
-        canvasContext.restore();
+        ActorArt.drawPlayer(canvasContext, this);
     }
 }
