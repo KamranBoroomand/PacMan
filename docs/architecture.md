@@ -8,7 +8,8 @@ The application is a static site. Scripts load in dependency order with `defer`;
 | `simulation-clock.js` | Bounded fixed-step frame scheduler and stable state digest |
 | `maze.js` | Remix maze construction, spawn point, and independent map copies |
 | `gameplay-utils.js` | Targeting, path selection, collision math, difficulty, and scoring helpers |
-| `pacman.js`, `ghost.js` | Actor movement, buffered turns, ghost decisions, and actor drawing |
+| `pacman.js`, `ghost.js` | Actor movement, buffered turns, ghost decisions, and drawing dispatch |
+| `actor-art.js` | Project-local geometric player and rival rendering, including frightened and returning states |
 | `maze-renderer.js` | Wall-layer rendering and invalidation by map, palette, or pixel scale |
 | `hud.js` | Text-only updates to the semantic scoreboard |
 | `audio.js` | Web Audio lifecycle, mixer, notes, ducking, pause, and cleanup |
@@ -41,7 +42,7 @@ Imports are limited to 2 MB files, 50,000 events, and one hour of tick indices. 
 
 ## Offline releases
 
-Installation precaches the complete runtime, local font, icons, and sprite assets. Activation removes only caches owned by this app and scope. The worker serves its cached HTML and corresponding modules together, preventing a network-fresh shell from loading older cached code. Unknown requests are fetched without being stored.
+Installation precaches the complete runtime, local font, icons, and geometric actor renderer. Activation removes only caches owned by this app and scope. The worker serves its cached HTML and corresponding modules together, preventing a network-fresh shell from loading older cached code. Unknown requests are fetched without being stored.
 
 A replacement worker waits until **Update Ready** sends `SKIP_WAITING`. After activation the page reloads. Cache names include the registration path so installations under different subpaths remain separate. Bump `CACHE_VERSION` for each changed runtime release.
 

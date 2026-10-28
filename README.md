@@ -73,7 +73,7 @@ The optional Lighthouse runner remains available through `LIGHTHOUSE_RUN=1 npm r
 
 Settings include reduced motion, larger scoreboard text, high-contrast and alternate palettes, one-handed controls, and separate master/effects/music levels. Menus use native controls with visible focus. A live region announces important phase, score, and life changes.
 
-The maze itself remains a visual game; these features do not provide a complete nonvisual play experience. Desktop Chromium and WebKit and a mobile Chromium profile are exercised locally. Firefox remains in the CI matrix; the current local Firefox launch limitation is recorded in [validation](docs/validation.md). Physical phones, controllers, and assistive-technology sessions still need manual qualification.
+The maze itself remains a visual game; these features do not provide a complete nonvisual play experience. Desktop Chromium, Firefox, WebKit, and a mobile Chromium profile pass the local browser suite. Firefox uses isolated application data on macOS; the upstream launch issue and workaround are recorded in [validation](docs/validation.md). Physical phones, controllers, and assistive-technology sessions still need manual qualification.
 
 ## Deployment
 
@@ -87,6 +87,6 @@ When runtime assets change, increment `CACHE_VERSION` in `service-worker.js`. Ke
 
 Project code is provided under the [MIT license](LICENSE). Bungee is bundled under the [SIL Open Font License](fonts/OFL.txt), with its original copyright notice, from the [Google Fonts repository](https://github.com/google/fonts/tree/main/ofl/bungee). Audio uses synthesized tones.
 
-PAC-MAN and related characters belong to their respective rights holders. This is an independent homage, without affiliation or endorsement. The repository's existing sprites and branding still need a separate rights/provenance review before broader distribution; the code license does not establish rights to those assets.
+PAC-MAN and related characters belong to their respective rights holders. This is an independent homage, without affiliation or endorsement. Current character drawings and maze-mark icons use project-local geometry. Media without established distribution rights has been removed from the current tree. See the [asset register](docs/assets.md) for file origins, licenses, and the remaining project-name/trademark limitation.
 
 [Roadmap](ROADMAP.md)

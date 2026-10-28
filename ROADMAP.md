@@ -8,12 +8,13 @@
 - Responsive scoreboard, local display font, keyboard focus states, form-key handling, and corrected horizontal D-pad input.
 - Complete offline precaching, scoped caches, relative manifest paths, and player-controlled updates.
 - Static build/preview commands, current test tooling, and browser journeys for offline startup and update acceptance.
+- Local Firefox qualification with isolated macOS application data; Chromium, Firefox, WebKit, and mobile Chromium pass their applicable tests.
+- Project-local geometric actor artwork and maze-mark icons, refreshed screenshots, and an asset provenance register.
 
 ## Next
 
-- Qualify Firefox on a working browser installation and run the complete matrix in CI.
 - Play full levels on physical phones and gamepads; test screen readers, zoom, rotation, and long sessions.
-- Confirm sprite and branding rights, or replace them with original artwork and identity.
+- Review project-name/trademark use before broader distribution; no trademark clearance is claimed.
 - Continue moving session state out of the coordinator behind explicit simulation interfaces.
 - Add a concise first-run touch tutorial and distinguish daily results from custom-seed leaderboards.
 

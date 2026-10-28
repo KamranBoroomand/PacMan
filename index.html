@@ -17,8 +17,8 @@
   <title>PacMan — Browser Arcade</title>
   <meta name="description" content="A browser arcade homage with seeded replays, daily challenges, and keyboard, touch, and gamepad controls.">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="images/pacman favicon.png">
-  <link rel="icon" type="image/png" href="images/pacman favicon.png">
+  <link rel="apple-touch-icon" href="images/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="images/maze-icon.svg">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -92,10 +92,6 @@
         <p class="stick-help">Drag to steer</p>
       </div>
 
-      <div style="display:none;">
-        <img id="animation" src="images/animations.gif" alt="pacman sprites">
-        <img id="ghosts" src="images/ghost.png" alt="ghost sprites">
-      </div>
     </section>
 
     <details class="settings-panel" id="settings-panel">
@@ -261,6 +257,7 @@
   <script src="scripts/simulation-clock.js" defer></script>
   <script src="scripts/game-config.js" defer></script>
   <script src="scripts/maze.js" defer></script>
+  <script src="scripts/actor-art.js" defer></script>
   <script src="scripts/pacman.js" defer></script>
   <script src="scripts/ghost.js" defer></script>
   <script src="scripts/game.js" defer></script>

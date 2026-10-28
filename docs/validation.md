@@ -14,19 +14,19 @@ Source inspection confirmed mixed render/gameplay timestamps, pause-sensitive de
 | --- | --- |
 | `npm ci` | Lockfile install succeeded in the working checkout and a clean index export; three development packages installed |
 | `npm run check` | Syntax/structure checks and 71 Node tests passed |
-| `npm run build` | Built the static artifact and validated all 13 runtime scripts against precaching |
-| `PLAYWRIGHT_VISUAL=1 npm run test:e2e -- --workers=2` | 72 passed, 20 Firefox launch failures, 16 deliberate exclusions |
+| `npm run build` | Built the static artifact and validated all 14 runtime scripts against precaching |
+| `PLAYWRIGHT_VISUAL=1 npm run test:e2e -- --workers=2` | 92 passed, zero failures, 16 deliberate exclusions |
 | `npm audit --json` | Zero reported vulnerabilities after updating Playwright from 1.51.0 |
 | `npm outdated --json` | No outdated packages reported at the time checked |
 | Workflow YAML parsing | All six workflow files parsed successfully; workflows were not dispatched |
 | `git diff --check`, `git diff --cached --check` | Passed |
 | Production-output smoke test | Fresh service-worker installation, offline reload, and session start from `dist/`; no uncaught browser errors |
 
-The same unit and full browser outcomes were reproduced from a clean export of the intended commit contents, with no existing dependencies, build output, or local evidence files. All browser projects run against the built artifact. The 16 exclusions are ten visual captures restricted to Chromium desktop/mobile, three touch-control cases excluded from desktop profiles, and three timing-budget cases excluded from profiles other than desktop Chromium. None represents a missing game feature. The twenty Firefox cases fail before the application loads; they are unavailable-environment failures, not passes. Chromium, WebKit, and mobile Chromium pass every applicable case, including ten visual captures. Captures support review and layout assertions, not pixel-diff regression guarantees.
+The prior modernization checkpoint was also checked from a clean index export. Final asset and Firefox changes were checked in the working checkout. All browser projects run against the built artifact. The 16 exclusions are ten visual captures restricted to Chromium desktop/mobile, three touch-control cases excluded from desktop profiles, and three timing-budget cases excluded from profiles other than desktop Chromium. None represents a missing game feature. All twenty Firefox application cases now pass. Chromium, WebKit, and mobile Chromium also pass every applicable case, including ten visual captures. Captures support review and layout assertions, not pixel-diff regression guarantees.
 
 Engine coverage includes pause and debug stepping, frightened expiration, scatter timing, ready/death deadlines, recording and replay, complete-run terminal state, preserved records during replay, maze connectivity, buffered turns, D-pad input, challenge rules, scoring helpers, storage failure, and rendering-cache invalidation. Browser coverage includes form-key handling, narrow HUDs, settings persistence, replay import/completion, level clear and cutscene skip, readable notices, visibility-event handling, offline startup, incomplete legacy-cache recovery, subpath installation, waiting updates, unrelated-cache retention, and uncaught-error detection.
 
-A shared input sequence produces the same simulation hash in the Node reference engine, Chromium, and WebKit. This is evidence for the exercised sequence and ruleset, not a proof across every possible run or browser release.
+A shared input sequence produces the same simulation hash in the Node reference engine, Chromium, Firefox, and WebKit. This is evidence for the exercised sequence and ruleset, not a proof across every possible run or browser release.
 
 ## Performance
 
@@ -45,26 +45,33 @@ The rendering improvement reduces measured drawing cost; the update timing fluct
 
 ## Qualification measurements
 
-The final packaged artifact was measured for another 6.5-second desktop Chromium session at 1440 × 1000 on the same host. Drawing p95 was 0.40 ms, wall drawing p95 0.10 ms, and gameplay update p95 0.60 ms. Animation-frame p95 was 16.70 ms with no slow frames in the 300-frame rolling window. The timer precision and short-run limitations above still apply.
+Before the geometric artwork replacement, the packaged artifact was measured for another 6.5-second desktop Chromium session at 1440 × 1000 on the same host. Drawing p95 was 0.40 ms, wall drawing p95 0.10 ms, and gameplay update p95 0.60 ms. Animation-frame p95 was 16.70 ms with no slow frames in the 300-frame rolling window. The timer precision and short-run limitations above still apply.
 
 After garbage collection, restart samples at 10, 110, and 210 restarts retained one document, 680 DOM nodes, and 86 event listeners each. Used JavaScript heap was 2,147,804, 2,181,884, and 2,206,864 bytes respectively. No accumulating nodes or listeners were observed; the roughly 59 KB heap increase does not establish absence of all leaks.
 
 Production screenshots and interaction review covered menu, mode selection, gameplay, pause/resume, settings, level transition, game over, leaderboard, and replay at 1440 × 1000, 390 × 844, 320 × 780, and 844 × 390. Every viewport had matching document/viewport widths and no uncaught errors. Gameplay collected pellets using actual keyboard input. Level-clear and terminal screens used controlled fixture state; complete manual level play is not claimed. Portrait and landscape layouts permit vertical scrolling.
 
+## Firefox qualification
+
+The default launch of bundled Firefox 157 failed before page load with “Could not find profile folder.” [Playwright issue #42768](https://github.com/microsoft/playwright/issues/42768) documents macOS 27 restrictions on Firefox's shared application-data lookup and the `CFFIXED_USER_HOME` workaround. This failure is separate from an application assertion failure.
+
+A fresh temporary home supplied through the browser launch environment allowed Firefox to start. The worker fixture precreates private `Downloads` and `Library/Application Support` directories, isolates each worker's application data, and removes it after browser shutdown. Precreation avoids macOS home-folder delete ACLs during cleanup. Normal Firefox profiles, system privacy settings, and ACLs were not changed. Playwright remains pinned to stable 1.64.1.
+
+Firefox then exposed a test-harness issue: navigating directly to the manifest starts a download in that browser. The legacy-cache test now seeds caches from a same-origin blank HTML route. No application change was needed. All twenty applicable Firefox tests pass, and temporary-home cleanup succeeds.
+
+CI retains the Firefox project on `ubuntu-latest`. These local branch changes were not pushed and no workflow was dispatched. Linux fallback execution was unnecessary because local isolated execution succeeded; no new Linux result is claimed.
+
 ## Asset provenance
 
-- Bungee is sourced from the official Google Fonts repository and retains its SIL Open Font License and original project copyright.
-- Sound uses the project's Web Audio tone patterns; no external sound recordings were added.
-- The player and ghost sprite files first appear in repository commit `b5802b5` as uploaded files. Their history supplies no upstream source or asset-specific license. The existing favicon, character imagery, and retained source video also lack independently established rights in this repository.
-- The README and social-preview images are captures of the finished implementation. The new 192/512 icons derive from the existing favicon and share its unresolved branding provenance.
-- The MIT code license is preserved. No broader asset-rights claim is made.
+The [asset register](assets.md) inventories current artwork, screenshots, icons, font, and synthesized audio, with origin and license information. Unverified imported character images, favicon, unused video, and placeholder were removed from the current tree. Both install icons and both public screenshots were replaced. Original Git history and the MIT and OFL notices remain intact.
+
+The retained project name and historical character names are an identity/trademark consideration. No trademark license or legal clearance is asserted; the MIT code license does not establish those rights.
 
 ## Limits
 
-- Matching Firefox 157.0, a previously installed Firefox revision, confirmed existing project-local profiles, canonical temporary paths, and a freshly downloaded isolated browser all fail before page load with “Could not find profile folder.” The complete matrix reports those failures explicitly; Firefox acceptance remains open.
 - Synthetic visibility-event regression checks pass. Both headed and headless tab-switch attempts on this host left `document.hidden` false, so actual operating-system background/foreground behavior was not qualified by those attempts.
 - The optional Lighthouse command without `LIGHTHOUSE_RUN=1` only reports that it is skipped. No Lighthouse score or accessibility certification is claimed.
 - Physical phones, real controllers, screen readers, complete manual level runs, long sessions, and Windows/Linux execution were not qualified locally.
 - WebKit automation is useful compatibility evidence but is not a physical iOS Safari test.
 - TypeScript type checking is not configured. The lint command performs syntax and project-structure checks, not a full semantic linter.
-- The maze remains primarily visual. Sprite/branding rights and Firefox qualification prevent an unrestricted release-readiness claim.
+- The maze remains primarily visual. Project-name/trademark clearance is outside this technical qualification.

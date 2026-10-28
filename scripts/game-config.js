@@ -227,7 +227,6 @@ const GHOST_DEFINITIONS = [
   {
     id: "blinky",
     displayName: "Blinky",
-    spriteIndex: 0,
     scatterTile: { x: 42, y: 1 },
     startInHouse: false,
     releaseDotThreshold: 0,
@@ -237,7 +236,6 @@ const GHOST_DEFINITIONS = [
   {
     id: "pinky",
     displayName: "Pinky",
-    spriteIndex: 1,
     scatterTile: { x: 1, y: 1 },
     startInHouse: true,
     releaseDotThreshold: 0,
@@ -247,7 +245,6 @@ const GHOST_DEFINITIONS = [
   {
     id: "inky",
     displayName: "Inky",
-    spriteIndex: 2,
     scatterTile: { x: 42, y: 29 },
     startInHouse: true,
     releaseDotThreshold: 6,
@@ -257,20 +254,12 @@ const GHOST_DEFINITIONS = [
   {
     id: "clyde",
     displayName: "Clyde",
-    spriteIndex: 3,
     scatterTile: { x: 1, y: 29 },
     startInHouse: true,
     releaseDotThreshold: 14,
     forceReleaseMs: 3200,
     spawnTile: { x: 22, y: 13 },
   },
-];
-
-const ghostImageLocations = [
-  { x: 0, y: 0 },
-  { x: 176, y: 0 },
-  { x: 0, y: 121 },
-  { x: 176, y: 121 },
 ];
 
 const FRUIT_TABLE = [

@@ -1,8 +1,6 @@
 const canvas = document.getElementById("canvas");
 const canvasContext = canvas.getContext("2d");
 const mazeRenderer = MazeRenderer.createMazeRenderer(canvasContext, () => document.createElement("canvas"));
-const pacmanFrames = document.getElementById("animation");
-const ghostFrames = document.getElementById("ghosts");
 const startGameButton = document.getElementById("start-game");
 const pauseToggleButton = document.getElementById("pause-toggle");
 const restartGameButton = document.getElementById("restart-game");
@@ -2139,10 +2137,6 @@ function createGhosts() {
       oneBlockSize,
       oneBlockSize,
       quantizeSpeed((pacman.speed * 0.86) * currentLevelTuning.ghostSpeedMultiplier),
-      ghostImageLocations[def.spriteIndex].x,
-      ghostImageLocations[def.spriteIndex].y,
-      124,
-      116,
       6 + i,
       {
         personality: def.id,

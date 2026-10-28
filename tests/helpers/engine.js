@@ -24,7 +24,7 @@ function createEngine() {
   };
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
-  for (const name of ["gameplay-utils", "game-storage", "replay-tools", "perf-guardrails", "simulation-clock", "game-config", "maze-renderer", "audio", "maze", "pacman", "ghost", "game"]) {
+  for (const name of ["gameplay-utils", "game-storage", "replay-tools", "perf-guardrails", "simulation-clock", "game-config", "maze-renderer", "audio", "maze", "actor-art", "pacman", "ghost", "game"]) {
     const code = fs.readFileSync(path.resolve(__dirname, `../../scripts/${name}.js`), "utf8");
     vm.runInContext(name === "game" ? code.replace(/boot\(\);\s*$/, "") : code, context);
   }
