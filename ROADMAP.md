@@ -1,31 +1,23 @@
 # Roadmap
 
-Last updated: **February 24, 2026**.
+## Implemented
 
-## Current State
-- Core gameplay loop, arcade-style ghost AI, level progression, challenge modes, replay tooling, and deterministic debug controls are implemented.
-- Accessibility and input coverage include keyboard remapping, touch controls, gamepad support, one-handed mode, reduced motion, palette options, and a lightweight live region for score/life/phase announcements.
-- PWA packaging (manifest + service worker) and release workflows (quality checks, visual lane, release tagging/changelog, stable-tag static deployment) are present.
-- Replay and settings portability now include replay schema versioning+migrations plus settings import/export presets.
-- Runtime guardrails now include pacing monitor diagnostics, Playwright frame-time budget checks, and an optional Lighthouse baseline budget lane.
-- Local validation currently passes for `npm run check`, static/PWA regression checks, and Playwright e2e browser matrix coverage.
+- Logical-tick gameplay timing, pause-safe effects and transitions, and simulation-driven player animation.
+- Seeded replay schema 3 with ruleset compatibility checks and full-state regression comparisons.
+- Separate configuration, maze, scheduler, wall renderer, audio, HUD, storage, and replay modules.
+- Responsive scoreboard, local display font, keyboard focus states, form-key handling, and corrected horizontal D-pad input.
+- Complete offline precaching, scoped caches, relative manifest paths, and player-controlled updates.
+- Static build/preview commands, current test tooling, and browser journeys for offline startup and update acceptance.
 
-## Next (High Priority)
-- [x] Split `scripts/game.js` into smaller modules for persistence/replay/performance helpers to reduce maintenance risk while preserving deterministic behavior.
-- [x] Expand Playwright coverage to a browser matrix (Chromium + Firefox + WebKit) plus a mobile viewport profile in CI.
-- [x] Add frame-time guardrails (runtime pacing monitor + automated regression tests) to catch stutter regressions early.
-- [x] Add lockfile-driven reproducible installs (`npm ci` in workflows and local contributor guidance).
-- [x] Add automated static-site deployment on stable release tags (not only site artifact upload).
-- [x] Add a lightweight accessibility live region for score/life/phase announcements for non-visual assistive tooling.
+## Next
 
-## Near-Term Enhancements
-- [x] Add performance budgets (frame-time guardrails in test harness plus optional Lighthouse baseline for landing shell).
-- [x] Version replay export schema explicitly and add migration handling for older replay payloads.
-- [x] Add optional debug overlays (ghost target tile and path intent) for AI tuning and regression triage.
-- [x] Add settings import/export so control/accessibility presets can move across devices.
+- Qualify Firefox on a working browser installation and run the complete matrix in CI.
+- Play full levels on physical phones and gamepads; test screen readers, zoom, rotation, and long sessions.
+- Confirm sprite and branding rights, or replace them with original artwork and identity.
+- Continue moving session state out of the coordinator behind explicit simulation interfaces.
+- Add a concise first-run touch tutorial and distinguish daily results from custom-seed leaderboards.
 
-## Backlog
-- [ ] Endless mode with post-level-cap dynamic difficulty scaling.
-- [ ] Split leaderboard views by daily-seed runs vs custom-seed runs.
-- [ ] First-run mobile tutorial overlay for touch and virtual-stick controls.
-- [ ] Optional CRT/post-process visual filter toggle.
+## Later
+
+- Consider an independently specified Classic ruleset with verified behavior and its own replay ruleset identifier.
+- Consider additional maze layouts after connectivity, difficulty, and complete-run tests are in place.
