@@ -63,3 +63,12 @@ test("createFramePacingMonitor emits breach callback with cooldown", () => {
   monitor.push(60, 1100);
   assert.equal(breachCount, 2);
 });
+
+test("warm-up samples never report a performance breach", () => {
+  let breaches = 0;
+  const monitor = perfGuardrails.createFramePacingMonitor({minSamples: 120, onBreach: () => breaches++});
+  for (let frame = 0; frame < 119; frame++) monitor.push(16.7, frame * 16.7);
+  assert.equal(breaches, 0);
+  monitor.push(16.7, 2000);
+  assert.equal(breaches, 0);
+});

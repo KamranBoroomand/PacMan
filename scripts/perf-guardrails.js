@@ -126,7 +126,7 @@
           toSafeNumber(config.breachCooldownMs, DEFAULTS.breachCooldownMs)
         );
         const canEmitBreach = safeNow - lastBreachAt >= cooldownMs;
-        if (!lastResult.pass && canEmitBreach && typeof config.onBreach === "function") {
+        if (lastResult.sampleCount >= config.minSamples && !lastResult.pass && canEmitBreach && typeof config.onBreach === "function") {
           lastBreachAt = safeNow;
           config.onBreach(lastResult);
         }

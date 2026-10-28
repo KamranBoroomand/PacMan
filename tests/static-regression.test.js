@@ -124,11 +124,14 @@ test("release and quality workflows are present", () => {
   assert.match(releaseWorkflow, /Rollback Guide/);
   assert.match(releaseWorkflow, /## Features/);
   assert.match(releaseWorkflow, /action-gh-release/);
-  assert.match(visualWorkflow, /Visual Regression/);
+  assert.match(visualWorkflow, /Visual Review/);
   assert.match(visualWorkflow, /PLAYWRIGHT_VISUAL=1/);
   assert.match(flakyWorkflow, /Flaky Quarantine/);
   assert.match(flakyWorkflow, /npx playwright test/);
-  assert.match(flakyWorkflow, /continue-on-error: true/);
+  assert.doesNotMatch(flakyWorkflow, /continue-on-error: true/);
+  assert.match(flakyWorkflow, /TEST_PATTERN:/);
+  assert.match(flakyWorkflow, /npm run build/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run build/);
   assert.match(deployWorkflow, /Deploy Stable Site/);
   assert.match(deployWorkflow, /actions\/deploy-pages/);
   assert.match(qualityWorkflow, /run_lighthouse/);

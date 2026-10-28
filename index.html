@@ -14,7 +14,8 @@
   <meta name="twitter:description" content="In-browser, canvas-based Pac-Man homage. Fully static.">
   <meta name="twitter:image" content="https://pacman.kamranboroomand.ir/images/pacman-share.png">
   <meta name="theme-color" content="#08131d">
-  <title>PacMan Game</title>
+  <title>PacMan — Browser Arcade</title>
+  <meta name="description" content="A browser arcade homage with seeded replays, daily challenges, and keyboard, touch, and gamepad controls.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="images/pacman favicon.png">
   <link rel="icon" type="image/png" href="images/pacman favicon.png">
@@ -22,38 +23,39 @@
 </head>
 <body>
   <div id="a11y-live-region" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-  <div class="bg-layer bg-pixel" aria-hidden="true"></div>
-  <div class="bg-layer bg-stars" aria-hidden="true"></div>
-  <div class="bg-layer bg-flow" aria-hidden="true"></div>
-  <div class="bg-layer bg-radial" aria-hidden="true"></div>
-
   <header class="site-header">
     <div class="header-pill">
       <div class="identity-block">
-        <p class="identity-kicker">1980 Classic Rewired</p>
         <h1 class="identity-name">
           <span class="title-main">PAC-MAN</span>
         </h1>
-        <p class="identity-subline">Play with keyboard, gamepad, touch, or virtual stick</p>
-        <div class="header-badges" aria-label="Feature highlights">
-          <span class="header-badge">60 FPS</span>
-          <span class="header-badge">ARCADE AI</span>
-          <span class="header-badge">PWA READY</span>
-        </div>
+        <p class="identity-subline">The maze is calling. Make every turn count.</p>
+
       </div>
 
       <nav class="header-links" aria-label="Project links">
         <a class="header-link" href="https://github.com/KamranBoroomand/PacMan" target="_blank" rel="noopener">Source</a>
-        <a class="header-link" href="https://pacman.kamranboroomand.ir/" target="_blank" rel="noopener">Production</a>
+        <a class="header-link" href="https://pacman.kamranboroomand.ir/" target="_blank" rel="noopener">Website</a>
       </nav>
     </div>
 
     <div class="game-actions" aria-label="Game controls">
-      <button id="start-game" class="action-btn" type="button">Start</button>
+        <label class="mode-picker" for="challenge-mode">
+          <span>Play mode</span>
+          <select id="challenge-mode">
+            <option value="classic">Remix</option>
+            <option value="time-attack">Time Attack</option>
+            <option value="no-power">No Power Pellets</option>
+            <option value="one-life">One Life</option>
+          </select>
+        </label>
+
+
+      <button id="start-game" class="action-btn" type="button">Start game</button>
       <button id="pause-toggle" class="action-btn" type="button" aria-pressed="false">Pause</button>
       <button id="restart-game" class="action-btn" type="button">Restart</button>
       <button id="replay-last" class="action-btn" type="button" disabled>Replay</button>
-      <button id="daily-challenge" class="action-btn" type="button">Daily</button>
+      <button id="daily-challenge" class="action-btn" type="button">Daily challenge</button>
       <button id="mute-toggle" class="action-btn" type="button" aria-pressed="false">Sound: On</button>
       <button id="arcade-view-toggle" class="action-btn desktop-only" type="button" aria-pressed="false">Arcade View</button>
       <button id="install-app" class="action-btn hidden" type="button">Install App</button>
@@ -63,7 +65,18 @@
 
   <main id="container" class="game-shell">
     <section class="canvas-shell">
-      <canvas id="canvas" class="gmap"></canvas>
+      <div id="game-hud" class="game-hud" aria-label="Session information">
+        <div class="session-strip"><span><span class="status-dot" aria-hidden="true"></span><span data-hud="phase">Ready to play</span></span><span><span data-hud="mode">Remix</span> / <span data-hud="ghost">scatter</span></span></div>
+        <dl class="scoreboard">
+          <div><dt>Score</dt><dd data-hud="score">0</dd></div>
+          <div><dt>Personal best</dt><dd data-hud="best">0</dd></div>
+          <div><dt>Level</dt><dd data-hud="level">1</dd></div>
+          <div><dt>Lives</dt><dd data-hud="lives">3</dd></div>
+        </dl>
+        <div class="run-strip"><span data-hud="status"></span><span class="session-notice" data-hud="notice" role="status"></span><span data-hud="seed"></span></div>
+      </div>
+      <canvas id="canvas" class="gmap" tabindex="0" aria-label="Game maze. Use arrow keys or WASD to steer; P pauses." aria-describedby="game-instructions">Your browser needs canvas support to play.</canvas>
+      <p id="game-instructions" class="board-caption"><span><kbd>↑ ↓ ← →</kbd> or <kbd>W A S D</kbd> Steer</span><span><kbd>P</kbd> Pause · <kbd>R</kbd> Restart</span><span>Touch: swipe the maze or use the pad.</span></p>
 
       <div id="touch-controls" class="touch-controls" aria-label="Touch controls">
         <button class="touch-btn touch-up" data-direction="up" aria-label="Move up" type="button">▲</button>
@@ -119,16 +132,6 @@
         <label class="settings-item settings-toggle" for="haptics-enabled">
           <span>Haptics</span>
           <input id="haptics-enabled" type="checkbox" />
-        </label>
-
-        <label class="settings-item" for="challenge-mode">
-          <span>Challenge Mode</span>
-          <select id="challenge-mode">
-            <option value="classic">Classic</option>
-            <option value="time-attack">Time Attack</option>
-            <option value="no-power">No Power Pellets</option>
-            <option value="one-life">One Life</option>
-          </select>
         </label>
 
         <label class="settings-item" for="palette-mode">
@@ -244,14 +247,20 @@
   </main>
 
   <footer class="site-footer">
-    <p class="footer-line">PacMan · Focus-first gameplay shell</p>
-    <p class="footer-line footer-muted">Arcade motion, modern controls, and offline-ready play.</p>
+    <p class="footer-line">An independent arcade homage. Local scores. No accounts.</p>
+    <p class="footer-line footer-muted">PAC-MAN belongs to its respective rights holders. This project is not affiliated with or endorsed by them.</p>
   </footer>
 
   <script src="scripts/gameplay-utils.js" defer></script>
   <script src="scripts/game-storage.js" defer></script>
   <script src="scripts/replay-tools.js" defer></script>
   <script src="scripts/perf-guardrails.js" defer></script>
+  <script src="scripts/maze-renderer.js" defer></script>
+  <script src="scripts/audio.js" defer></script>
+  <script src="scripts/hud.js" defer></script>
+  <script src="scripts/simulation-clock.js" defer></script>
+  <script src="scripts/game-config.js" defer></script>
+  <script src="scripts/maze.js" defer></script>
   <script src="scripts/pacman.js" defer></script>
   <script src="scripts/ghost.js" defer></script>
   <script src="scripts/game.js" defer></script>

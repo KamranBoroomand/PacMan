@@ -1,119 +1,51 @@
-const CACHE_VERSION = "v9";
-const STATIC_CACHE_NAME = `pacman-static-${CACHE_VERSION}`;
-const RUNTIME_CACHE_NAME = `pacman-runtime-${CACHE_VERSION}`;
+const CACHE_VERSION = "v11";
+const CACHE_SCOPE = new URL(self.registration.scope).pathname;
+const STATIC_CACHE_NAME = `pacman-static-${CACHE_SCOPE}-${CACHE_VERSION}`;
+const RUNTIME_CACHE_NAME = `pacman-runtime-${CACHE_SCOPE}-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
-  "./",
-  "./index.html",
-  "./manifest.webmanifest",
-  "./css/style.css",
-  "./scripts/gameplay-utils.js",
-  "./scripts/pacman.js",
-  "./scripts/ghost.js",
-  "./scripts/game.js",
-  "./images/animations.gif",
-  "./images/ghost.png",
-  "./images/pacman favicon.png",
-  "./images/pacman-share.png",
+  "./", "./index.html", "./manifest.webmanifest", "./css/style.css",
+  "./fonts/Bungee-Regular.ttf",
+  "./scripts/gameplay-utils.js", "./scripts/game-storage.js", "./scripts/replay-tools.js",
+  "./scripts/perf-guardrails.js", "./scripts/simulation-clock.js", "./scripts/game-config.js",
+  "./scripts/maze.js", "./scripts/maze-renderer.js", "./scripts/audio.js", "./scripts/hud.js", "./scripts/pacman.js", "./scripts/ghost.js", "./scripts/game.js",
+  "./images/animations.gif", "./images/ghost.png", "./images/pacman favicon.png",
+  "./images/icon-192.png", "./images/icon-512.png", "./images/pacman-share.png",
 ];
 
-function isVersionedAsset(pathname) {
-  return pathname.endsWith(".html") || pathname.endsWith(".css") || pathname.endsWith(".js");
-}
-
-function writeToCache(cacheName, request, response) {
-  if (!response || response.status !== 200 || response.type === "opaque") {
-    return Promise.resolve();
-  }
-
-  return caches.open(cacheName).then((cache) => {
-    cache.put(request, response.clone());
-    if (request.mode === "navigate") {
-      cache.put("./index.html", response.clone());
-    }
-  });
-}
-
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(STATIC_CACHE_NAME)
-      .then((cache) => cache.addAll(STATIC_ASSETS))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(caches.open(STATIC_CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));
 });
 
 self.addEventListener("activate", (event) => {
-  const activeNames = new Set([STATIC_CACHE_NAME, RUNTIME_CACHE_NAME]);
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => !activeNames.has(key))
-          .map((key) => caches.delete(key))
-      )
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const names = await caches.keys();
+    await Promise.all(names.filter((name) => {
+      const owned = name.startsWith(`pacman-static-${CACHE_SCOPE}-`) ||
+        name.startsWith(`pacman-runtime-${CACHE_SCOPE}-`);
+      const legacyRoot = CACHE_SCOPE === "/" && /^pacman-(static|runtime)-v\d+$/.test(name);
+      return (owned || legacyRoot) && name !== STATIC_CACHE_NAME && name !== RUNTIME_CACHE_NAME;
+    }).map((name) => caches.delete(name)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("message", (event) => {
-  if (!event || !event.data) return;
-  if (event.data.type === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
+  if (event.data && event.data.type === "SKIP_WAITING") event.waitUntil(self.skipWaiting());
 });
 
+// A release serves one cached shell and its matching modules until the player accepts an update.
 self.addEventListener("fetch", (event) => {
   const request = event.request;
-  const requestUrl = new URL(request.url);
-
-  if (request.method !== "GET") {
-    return;
-  }
-
-  if (requestUrl.origin !== self.location.origin) {
-    return;
-  }
-
-  if (requestUrl.pathname.endsWith("/service-worker.js")) {
-    event.respondWith(
-      fetch(request, { cache: "no-store" }).catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  const networkFirst = request.mode === "navigate" || isVersionedAsset(requestUrl.pathname);
-  const cacheName = networkFirst ? STATIC_CACHE_NAME : RUNTIME_CACHE_NAME;
-
-  if (networkFirst) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          writeToCache(cacheName, request, response);
-          return response;
-        })
-        .catch(() =>
-          caches.match(request).then((cached) => {
-            if (cached) return cached;
-            if (request.mode === "navigate") {
-              return caches.match("./index.html");
-            }
-            return undefined;
-          })
-        )
-    );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request)
-        .then((response) => {
-          writeToCache(cacheName, request, response);
-          return response;
-        })
-        .catch(() => cached);
-    })
-  );
+  const url = new URL(request.url);
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (!url.pathname.startsWith(CACHE_SCOPE) || url.pathname.endsWith("/service-worker.js")) return;
+  event.respondWith((async () => {
+    const cache = await caches.open(STATIC_CACHE_NAME);
+    const cached = request.mode === "navigate"
+      ? await cache.match("./index.html")
+      : await cache.match(request, { ignoreSearch: true });
+    if (cached) return cached;
+    try { return await fetch(request); }
+    catch { return Response.error(); }
+  })());
 });

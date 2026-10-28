@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const gamePath = path.resolve(__dirname, "../scripts/game.js");
-const gameJs = fs.readFileSync(gamePath, "utf8");
+const gameJs = fs.readFileSync(gamePath, "utf8") + fs.readFileSync(path.resolve(__dirname, "../scripts/maze.js"), "utf8") + fs.readFileSync(path.resolve(__dirname, "../scripts/game-config.js"), "utf8");
 
 function extractLiteral(regex, label) {
   const match = gameJs.match(regex);

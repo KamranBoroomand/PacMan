@@ -1,4 +1,4 @@
-name: Visual Regression
+name: Visual Review
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   visual:
-    name: Playwright Visual Snapshots
+    name: Playwright Visual Captures
     runs-on: ubuntu-latest
 
     steps:
@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -25,5 +25,12 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: Run visual regression tests
-        run: PLAYWRIGHT_VISUAL=1 npm run test:e2e -- --project=desktop-chromium
+      - name: Capture interface states
+        run: PLAYWRIGHT_VISUAL=1 npm run test:e2e -- --project=desktop-chromium --project=mobile-chromium
+
+      - name: Upload visual captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-review
+          path: test-results

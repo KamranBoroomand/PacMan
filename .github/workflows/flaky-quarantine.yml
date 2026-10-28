@@ -12,7 +12,6 @@ jobs:
   quarantine:
     name: Quarantine Playwright Spec
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -21,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -30,8 +29,13 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: Run targeted flaky test
-        run: npx playwright test --project=desktop-chromium --grep "${{ inputs.test_pattern }}" --retries=2
+      - name: Build static site
+        run: npm run build
+
+      - name: Run targeted test repeatedly
+        env:
+          TEST_PATTERN: ${{ inputs.test_pattern }}
+        run: npx playwright test --project=desktop-chromium --grep "$TEST_PATTERN" --repeat-each=3
 
       - name: Upload Playwright report
         if: always()

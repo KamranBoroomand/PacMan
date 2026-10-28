@@ -25,6 +25,11 @@ jobs:
   release:
     name: Tag and Publish Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_CHANNEL: ${{ inputs.channel }}
 
     steps:
       - name: Checkout
@@ -35,7 +40,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -46,7 +51,7 @@ jobs:
 
       - name: Validate semantic version
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="$RELEASE_VERSION"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "Invalid semantic version: $VERSION"
             exit 1
@@ -55,11 +60,11 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          if [ "${{ inputs.channel }}" = "alpha" ]; then
-            TAG="alpha-v${{ inputs.version }}"
+          if [ "$RELEASE_CHANNEL" = "alpha" ]; then
+            TAG="alpha-v${RELEASE_VERSION}"
             LAST_TAG=$(git tag --list 'alpha-v*' --sort=-version:refname | head -n 1 || true)
           else
-            TAG="v${{ inputs.version }}"
+            TAG="v${RELEASE_VERSION}"
             LAST_TAG=$(git tag --list 'v*' --sort=-version:refname | head -n 1 || true)
           fi
           RANGE="HEAD"
@@ -91,7 +96,7 @@ jobs:
           {
             echo "# PacMan ${TAG}"
             echo
-            echo "Channel: **${{ inputs.channel }}**"
+            echo "Channel: **$RELEASE_CHANNEL**"
             echo
             if [ -n "$LAST_TAG" ]; then
               echo "Changes since ${LAST_TAG}"
@@ -121,13 +126,11 @@ jobs:
       - name: Create and push git tag
         id: tag
         run: |
-          if [ "${{ inputs.channel }}" = "alpha" ]; then
-            TAG="alpha-v${{ inputs.version }}"
+          if [ "$RELEASE_CHANNEL" = "alpha" ]; then
+            TAG="alpha-v${RELEASE_VERSION}"
           else
-            TAG="v${{ inputs.version }}"
+            TAG="v${RELEASE_VERSION}"
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
 
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Tag ${TAG} already exists."

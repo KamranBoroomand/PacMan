@@ -4,14 +4,7 @@ const { spawnSync } = require("node:child_process");
 
 const projectRoot = path.resolve(__dirname, "..");
 const syntaxTargets = [
-  "scripts/game.js",
-  "scripts/ghost.js",
-  "scripts/game-storage.js",
-  "scripts/perf-guardrails.js",
-  "scripts/pacman.js",
-  "scripts/replay-tools.js",
-  "scripts/gameplay-utils.js",
-  "scripts/lint.js",
+  ...collectJsFilesRecursively(path.join(projectRoot, "scripts"), "scripts"),
   "service-worker.js",
   "playwright.config.js",
 ];
@@ -115,7 +108,7 @@ if (
   fail("[structure] foundational utility scripts must load before pacman.js.");
 }
 
-const gameJs = readText("scripts/game.js");
+const gameJs = readText("scripts/game.js") + readText("scripts/game-config.js");
 ensureIncludes(gameJs, "HIGH_SCORE_STORAGE_KEY", "[gameplay] High score persistence key is missing.");
 ensureIncludes(gameJs, "SETTINGS_STORAGE_KEY", "[settings] Settings persistence key is missing.");
 ensureIncludes(gameJs, "GHOST_DEFINITIONS", "[ai] Ghost personality definitions are missing.");
