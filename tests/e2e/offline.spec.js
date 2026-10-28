@@ -63,7 +63,9 @@ test("subpath install keeps updates waiting and preserves unrelated caches", asy
 });
 
 test("incomplete legacy caches do not poison a fresh release", async ({ page }) => {
-  await page.goto("/manifest.webmanifest");
+  await page.route("**/cache-seed.html", (route) => route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Cache seed</title>" }));
+  await page.goto("/cache-seed.html");
+  await page.unroute("**/cache-seed.html");
   await page.evaluate(async () => {
     const old = await caches.open("pacman-static-v9");
     await old.put(new URL("index.html", location.href), new Response("<h1>Outdated shell</h1>", {headers:{"Content-Type":"text/html"}}));
