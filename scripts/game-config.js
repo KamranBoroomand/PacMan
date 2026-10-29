@@ -31,11 +31,11 @@ const MIN_FRUIT_SPAWN_DISTANCE = 8;
 const MIN_GHOST_INITIAL_SPAWN_DISTANCE = 7;
 const SETTINGS_STORAGE_KEY = "pacman.settings.v1";
 const HIGH_SCORE_STORAGE_KEY = "pacman.highScore";
-const DAILY_CHALLENGE_STORAGE_KEY = "pacman.daily.v1";
+const DAILY_CHALLENGE_STORAGE_KEY = "pacman.daily.arcade-maps.v1";
 const LEADERBOARD_STORAGE_KEY = "pacman.leaderboard.v1";
 const ARCADE_VIEW_STORAGE_KEY = "pacman.arcadeView.enabled";
 const REPLAY_HASH_PREFIX = "#replay=";
-const REPLAY_SCHEMA_VERSION = 3;
+const REPLAY_SCHEMA_VERSION = 4;
 const SETTINGS_TRANSFER_SCHEMA_VERSION = 1;
 const SCORE_ANNOUNCEMENT_STEP = 100;
 const PERF_GUARDRAIL_CONFIG = Object.freeze({
@@ -72,58 +72,10 @@ const DEFAULT_GAMEPAD_MAP = {
   mute: 2,
 };
 const MUSIC_STEP_INTERVAL_MS = 250;
-const GHOST_HOME_TILE = { x: 21, y: 13 };
-const GHOST_HOUSE_EXIT_TILE = { x: 21, y: 12 };
-const GHOST_HOUSE_EXIT_BY_PERSONALITY = {
-  blinky: { x: 21, y: 11 },
-  pinky: { x: 21, y: 12 },
-  inky: { x: 21, y: 12 },
-  clyde: { x: 21, y: 12 },
-};
 const BASE_AUDIO_GAIN = 0.25;
 const ANALYTICS_EVENT_NAME = "pacman:analytics";
-const GHOST_MODE_SCHEDULE = [
-  { mode: "scatter", durationMs: 7000 },
-  { mode: "chase", durationMs: 20000 },
-  { mode: "scatter", durationMs: 7000 },
-  { mode: "chase", durationMs: 20000 },
-  { mode: "scatter", durationMs: 5000 },
-  { mode: "chase", durationMs: 20000 },
-  { mode: "scatter", durationMs: 5000 },
-  { mode: "chase", durationMs: Infinity },
-];
-
-const GHOST_MODE_SCHEDULE_BY_LEVEL = [
-  GHOST_MODE_SCHEDULE,
-  GHOST_MODE_SCHEDULE,
-  GHOST_MODE_SCHEDULE,
-  [
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: Infinity },
-  ],
-  [
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: Infinity },
-  ],
-  [
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 20000 },
-    { mode: "scatter", durationMs: 5000 },
-    { mode: "chase", durationMs: 1033000 },
-    { mode: "scatter", durationMs: 17 },
-    { mode: "chase", durationMs: Infinity },
-  ],
-];
+const GHOST_MODE_SCHEDULE = GameplayUtils.getGhostModeScheduleForLevel(1);
+const GHOST_MODE_SCHEDULE_BY_LEVEL = [1,2,3,4,5].map(level => GameplayUtils.getGhostModeScheduleForLevel(level));
 
 const CUTSCENES_BY_LEVEL = {
   2: {
@@ -224,42 +176,10 @@ const COLOR_PALETTES = {
 };
 
 const GHOST_DEFINITIONS = [
-  {
-    id: "blinky",
-    displayName: "Blinky",
-    scatterTile: { x: 42, y: 1 },
-    startInHouse: false,
-    releaseDotThreshold: 0,
-    forceReleaseMs: 0,
-    spawnTile: { x: 21, y: 11 },
-  },
-  {
-    id: "pinky",
-    displayName: "Pinky",
-    scatterTile: { x: 1, y: 1 },
-    startInHouse: true,
-    releaseDotThreshold: 0,
-    forceReleaseMs: 700,
-    spawnTile: { x: 20, y: 13 },
-  },
-  {
-    id: "inky",
-    displayName: "Inky",
-    scatterTile: { x: 42, y: 29 },
-    startInHouse: true,
-    releaseDotThreshold: 6,
-    forceReleaseMs: 1800,
-    spawnTile: { x: 21, y: 13 },
-  },
-  {
-    id: "clyde",
-    displayName: "Clyde",
-    scatterTile: { x: 1, y: 29 },
-    startInHouse: true,
-    releaseDotThreshold: 14,
-    forceReleaseMs: 3200,
-    spawnTile: { x: 22, y: 13 },
-  },
+  {id:"blinky",displayName:"Blinky",startInHouse:false},
+  {id:"pinky",displayName:"Pinky",startInHouse:true},
+  {id:"inky",displayName:"Inky",startInHouse:true},
+  {id:"clyde",displayName:"Clyde",startInHouse:true},
 ];
 
 const FRUIT_TABLE = [
@@ -292,6 +212,7 @@ const DEFAULT_SETTINGS = {
   musicEnabled: true,
   hapticsEnabled: false,
   mobileInputMode: "buttons",
+  mapId: "remix",
   challengeMode: CHALLENGE_MODES.CLASSIC,
   paletteMode: "classic",
   reducedMotion: false,

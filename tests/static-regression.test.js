@@ -45,7 +45,7 @@ test("game.js keeps arcade AI, level progression, and phase states", () => {
 
   assert.match(gameJs, /GHOST_DEFINITIONS/);
   assert.match(gameJs, /GHOST_MODE_SCHEDULE/);
-  assert.match(gameJs, /GHOST_MODE_SCHEDULE_BY_LEVEL/);
+  assert.match(gameJs, /getGhostModeScheduleForLevel/);
   assert.match(gameJs, /updateCruiseElroyState/);
   assert.match(gameJs, /getGhostTargetForPersonality/);
   assert.match(gameJs, /function startNextLevel/);

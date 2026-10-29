@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v12";
+const CACHE_VERSION = "v13";
 const CACHE_SCOPE = new URL(self.registration.scope).pathname;
 const STATIC_CACHE_NAME = `pacman-static-${CACHE_SCOPE}-${CACHE_VERSION}`;
 const RUNTIME_CACHE_NAME = `pacman-runtime-${CACHE_SCOPE}-${CACHE_VERSION}`;
@@ -8,7 +8,7 @@ const STATIC_ASSETS = [
   "./scripts/gameplay-utils.js", "./scripts/game-storage.js", "./scripts/replay-tools.js",
   "./scripts/perf-guardrails.js", "./scripts/simulation-clock.js", "./scripts/game-config.js",
   "./scripts/actor-art.js", "./scripts/maze.js", "./scripts/maze-renderer.js", "./scripts/audio.js", "./scripts/hud.js", "./scripts/pacman.js", "./scripts/ghost.js", "./scripts/game.js",
-  "./images/maze-icon.svg",
+  "./images/maze-icon.svg", "./images/ghost.png", "./images/animations.gif", "./images/pacman favicon.png",
   "./images/icon-192.png", "./images/icon-512.png", "./images/pacman-share.png",
 ];
 

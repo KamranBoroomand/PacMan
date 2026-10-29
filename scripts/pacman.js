@@ -48,7 +48,8 @@ class Pacman {
         if (map[mapY][mapX] === 2 || map[mapY][mapX] === 4) {
             const isPowerPellet = map[mapY][mapX] === 4;
             map[mapY][mapX] = 0;
-            const points = isPowerPellet ? 5 : 1;
+            lastPelletAt = lastUpdateNow;
+            const points = isPowerPellet ? 50 : 10;
             if (typeof addScore === "function") {
                 addScore(points);
             } else {

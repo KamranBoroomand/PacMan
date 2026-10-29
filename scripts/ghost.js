@@ -15,12 +15,14 @@ class Ghost {
         this.width = width;
         this.height = height;
         this.baseSpeed = speed;
-        this.frightenedSpeed = Math.max(oneBlockSize / 10, speed * 0.72);
+        this.frightenedSpeed = oneBlockSize / 16 / .8 * .5;
         this.eatenSpeed = Math.max(oneBlockSize / 4, speed * 1.35);
         this.speed = speed;
         this.direction = DIRECTION_LEFT;
         this.range = range;
         this.state = "normal";
+        this.houseDots = 0;
+        this.suppressFrightened = false;
         this.personality = options.personality || "blinky";
         this.displayName = options.displayName || this.personality;
         this.scatterTile = options.scatterTile || { x: 1, y: 1 };
@@ -35,14 +37,9 @@ class Ghost {
         };
 
         this.target = randomTargetsForGhosts[0];
-        const randomFn = typeof randomFloat === "function" ? randomFloat : Math.random;
-        this.randomTargetIndex = parseInt(
-            randomFn() * randomTargetsForGhosts.length,
-            10
-        );
-        this.directionTimer = null;
-        this.frightenedTurnsRemaining = 0;
         this.debugIntent = null;
+        this.plannedDirection = null;
+        this.pendingReverse = false;
     }
 
     dispose() {
@@ -54,7 +51,7 @@ class Ghost {
 
     setLevelSpeed(baseSpeed) {
         this.baseSpeed = baseSpeed;
-        this.frightenedSpeed = Math.max(oneBlockSize / 10, this.baseSpeed * 0.72);
+        this.frightenedSpeed = oneBlockSize / 16 / .8 * .5;
         this.eatenSpeed = Math.max(oneBlockSize / 4, this.baseSpeed * 1.35);
         this.syncSpeedWithState();
     }
@@ -110,16 +107,7 @@ class Ghost {
     setFrightenedMode(enabled) {
         if (this.isEaten()) return;
         const nextState = enabled ? "frightened" : "normal";
-        if (this.state !== nextState) {
-            this.reverseDirection();
-            if (enabled) {
-                const limit =
-                    typeof getFrightenedTurnLimit === "function"
-                        ? getFrightenedTurnLimit()
-                        : 6;
-                this.frightenedTurnsRemaining = Math.max(0, limit);
-            }
-        }
+        if (enabled && this.state !== nextState) this.pendingReverse = true;
         this.setState(nextState);
     }
 
@@ -128,38 +116,14 @@ class Ghost {
     }
 
     releaseFromHouse() {
-        if (
-            typeof getGhostHouseExitTargetForPersonality !== "function" &&
-            typeof getGhostHouseExitTarget !== "function"
-        ) {
-            this.setInHouse(false);
-            return;
-        }
-
-        const exitTarget =
-            typeof getGhostHouseExitTargetForPersonality === "function"
-                ? getGhostHouseExitTargetForPersonality(this.personality)
-                : getGhostHouseExitTarget();
-        const exitTileX = parseInt(exitTarget.x / oneBlockSize, 10);
-        const exitTileY = parseInt(exitTarget.y / oneBlockSize, 10);
-
-        let safeTarget = exitTarget;
-        if (!this.isWalkableTile(exitTileX, exitTileY, map)) {
-            const fallbackTarget =
-                typeof getGhostHouseExitTarget === "function"
-                    ? getGhostHouseExitTarget()
-                    : { x: this.spawnX, y: this.spawnY };
-            safeTarget = fallbackTarget;
-        }
-
-        this.x = safeTarget.x;
-        this.y = safeTarget.y;
-        this.direction = DIRECTION_UP;
-        this.setInHouse(false);
+        this.houseState.inside = true;
+        this.houseState.exiting = true;
+        this.plannedDirection = null;
+        lastPelletAt = lastUpdateNow;
     }
 
     maybeReleaseFromHouse() {
-        if (!this.isInHouse()) return;
+        if (!this.isInHouse() || this.houseState.exiting) return;
         if (typeof canReleaseGhostFromHouse !== "function") return;
         const shouldRelease = canReleaseGhostFromHouse(this);
         if (shouldRelease) {
@@ -171,7 +135,7 @@ class Ghost {
         if (this.isEaten()) return;
         const frightenedActive =
             typeof isGhostFrightened === "function" && isGhostFrightened();
-        this.setFrightenedMode(frightenedActive);
+        this.setFrightenedMode(frightenedActive && !this.suppressFrightened);
     }
 
     getHomeTarget() {
@@ -179,14 +143,6 @@ class Ghost {
             return getGhostHomeTarget();
         }
         return randomTargetsForGhosts[0];
-    }
-
-    getFrightenedTarget() {
-        if (typeof getFrightenedTargetForGhost === "function") {
-            const target = getFrightenedTargetForGhost(this);
-            if (target) return target;
-        }
-        return randomTargetsForGhosts[this.randomTargetIndex];
     }
 
     getPersonalityTarget() {
@@ -206,17 +162,19 @@ class Ghost {
 
     moveProcess() {
         this.maybeReleaseFromHouse();
-        if (this.isInHouse()) {
+        if (this.isInHouse() && !this.houseState.exiting) {
             this.debugIntent = null;
             return;
         }
 
         this.updateModeFromGlobalState();
 
-        if (this.isEaten()) {
+        if (this.houseState.exiting) {
+            this.target = getGhostHouseExitTarget();
+        } else if (this.isEaten()) {
             this.target = this.getHomeTarget();
         } else if (this.isFrightened()) {
-            this.target = this.getFrightenedTarget();
+            this.target = { x: this.x, y: this.y };
         } else {
             this.target = this.getPersonalityTarget();
         }
@@ -230,16 +188,20 @@ class Ghost {
             return;
         }
 
-        if (this.isEaten() && this.hasReachedTargetTile(this.getHomeTarget())) {
-            const frightenedActive =
-                typeof isGhostFrightened === "function" && isGhostFrightened();
-            this.setState(frightenedActive ? "frightened" : "normal");
+        if (this.houseState.exiting && this.hasReachedTargetTile(getGhostHouseExitTarget()) &&
+            this.x % oneBlockSize === 0 && this.y % oneBlockSize === 0) {
+            this.houseState.exiting = false;
+            this.setInHouse(false);
+            this.direction = DIRECTION_LEFT;
+            this.plannedDirection = null;
         }
-    }
-
-    changeRandomDirection() {
-        this.randomTargetIndex =
-            (this.randomTargetIndex + 1) % randomTargetsForGhosts.length;
+        if (this.isEaten() && this.hasReachedTargetTile(this.getHomeTarget()) &&
+            this.x % oneBlockSize === 0 && this.y % oneBlockSize === 0) {
+            this.setState("normal");
+            this.suppressFrightened = true;
+            if (this.personality === "blinky") this.releaseFromHouse();
+            else this.setInHouse(true);
+        }
     }
 
     handleTunnelWrap() {
@@ -261,37 +223,22 @@ class Ghost {
     }
 
     moveBackwards() {
-        switch (this.direction) {
-            case DIRECTION_RIGHT:
-                this.x -= this.speed;
-                break;
-            case DIRECTION_UP:
-                this.y += this.speed;
-                break;
-            case DIRECTION_LEFT:
-                this.x += this.speed;
-                break;
-            case DIRECTION_BOTTOM:
-                this.y -= this.speed;
-                break;
-        }
+        const vector = this.getDirectionVector(this.direction);
+        this.x -= vector.x * (this.lastMoveDistance || this.speed);
+        this.y -= vector.y * (this.lastMoveDistance || this.speed);
     }
 
     moveForwards() {
-        switch (this.direction) {
-            case DIRECTION_RIGHT:
-                this.x += this.speed;
-                break;
-            case DIRECTION_UP:
-                this.y -= this.speed;
-                break;
-            case DIRECTION_LEFT:
-                this.x -= this.speed;
-                break;
-            case DIRECTION_BOTTOM:
-                this.y += this.speed;
-                break;
-        }
+        const vector = this.getDirectionVector(this.direction);
+        const coordinate = vector.x ? this.x : this.y;
+        const sign = vector.x || vector.y;
+        const remainder = ((coordinate % oneBlockSize) + oneBlockSize) % oneBlockSize;
+        const boundary = remainder < 0.00001 ? oneBlockSize : sign > 0 ? oneBlockSize - remainder : remainder;
+        this.lastMoveDistance = Math.min(this.speed, boundary);
+        this.x += vector.x * this.lastMoveDistance;
+        this.y += vector.y * this.lastMoveDistance;
+        this.x = Math.round(this.x * 1000000) / 1000000;
+        this.y = Math.round(this.y * 1000000) / 1000000;
     }
 
     checkCollisions() {
@@ -308,7 +255,7 @@ class Ghost {
                 this.width,
                 this.height,
                 oneBlockSize,
-                { allowHorizontalTunnelWrap: true }
+                { allowHorizontalTunnelWrap: true, allowHouseGate: this.isEaten() || this.isInHouse() }
             );
         }
 
@@ -357,67 +304,25 @@ class Ghost {
     }
 
     changeDirectionIfPossible() {
-        const tempDirection = this.direction;
-        let nextDirection = this.calculateNewDirection(
-            map,
-            parseInt(this.target.x / oneBlockSize, 10),
-            parseInt(this.target.y / oneBlockSize, 10)
-        );
-
-        if (typeof nextDirection === "undefined") {
-            this.direction = tempDirection;
-            return;
-        }
-
-        const isHorizontal = (direction) =>
-            direction === DIRECTION_LEFT || direction === DIRECTION_RIGHT;
-        const currentHorizontal = isHorizontal(tempDirection);
-        const nextHorizontal = isHorizontal(nextDirection);
-
-        if (currentHorizontal !== nextHorizontal) {
-            if (nextHorizontal) {
-                const snappedY = this.snapCoordinateToGrid(this.y);
-                if (snappedY === null) {
-                    nextDirection = tempDirection;
-                } else {
-                    this.y = snappedY;
-                }
-            } else {
-                const snappedX = this.snapCoordinateToGrid(this.x);
-                if (snappedX === null) {
-                    nextDirection = tempDirection;
-                } else {
-                    this.x = snappedX;
-                }
-            }
-        }
-
-        this.direction = nextDirection;
-
-        this.moveForwards();
-        if (this.checkCollisions()) {
-            this.moveBackwards();
-            this.direction = tempDirection;
-
-            this.moveForwards();
-            if (this.checkCollisions()) {
-                this.moveBackwards();
-                const oppositeDirection = this.getOppositeDirection(tempDirection);
-                this.direction = oppositeDirection;
-
-                this.moveForwards();
-                if (this.checkCollisions()) {
-                    this.moveBackwards();
-                    this.direction = tempDirection;
-                } else {
-                    this.moveBackwards();
-                }
-            } else {
-                this.moveBackwards();
-            }
+        const epsilon = 0.00001;
+        const aligned = Math.abs(this.x / oneBlockSize - Math.round(this.x / oneBlockSize)) < epsilon &&
+            Math.abs(this.y / oneBlockSize - Math.round(this.y / oneBlockSize)) < epsilon;
+        if (!aligned) return;
+        const tile = { x: Math.round(this.x / oneBlockSize), y: Math.round(this.y / oneBlockSize) };
+        const available = this.getAvailableDirections(tile.x, tile.y, map);
+        if (this.pendingReverse && !this.isEaten() && !this.houseState.exiting) {
+            this.reverseDirection();
+            this.pendingReverse = false;
+            this.plannedDirection = null;
+        } else if (this.plannedDirection !== null && available.includes(this.plannedDirection)) {
+            this.direction = this.plannedDirection;
         } else {
-            this.moveBackwards();
+            this.direction = this.calculateNewDirection(map, this.target.x / oneBlockSize, this.target.y / oneBlockSize, tile);
         }
+        const ahead = this.getNeighborTile(tile.x, tile.y, this.direction, map);
+        if (ahead && this.isWalkableTile(ahead.x, ahead.y, map)) {
+            this.plannedDirection = this.calculateNewDirection(map, this.target.x / oneBlockSize, this.target.y / oneBlockSize, ahead);
+        } else this.plannedDirection = null;
     }
 
     snapCoordinateToGrid(value) {
@@ -447,38 +352,7 @@ class Ghost {
     }
 
     getDirectionPriority(direction) {
-        const defaultOrder = [
-            DIRECTION_UP,
-            DIRECTION_LEFT,
-            DIRECTION_BOTTOM,
-            DIRECTION_RIGHT,
-        ];
-        const personalityOrderByGhost = {
-            blinky: defaultOrder,
-            pinky: [
-                DIRECTION_LEFT,
-                DIRECTION_UP,
-                DIRECTION_RIGHT,
-                DIRECTION_BOTTOM,
-            ],
-            inky: [
-                DIRECTION_BOTTOM,
-                DIRECTION_RIGHT,
-                DIRECTION_UP,
-                DIRECTION_LEFT,
-            ],
-            clyde: [
-                DIRECTION_BOTTOM,
-                DIRECTION_LEFT,
-                DIRECTION_RIGHT,
-                DIRECTION_UP,
-            ],
-        };
-
-        const order =
-            personalityOrderByGhost[this.personality] || defaultOrder;
-        const priority = order.indexOf(direction);
-        return priority === -1 ? defaultOrder.length : priority;
+        return [DIRECTION_UP, DIRECTION_LEFT, DIRECTION_BOTTOM, DIRECTION_RIGHT].indexOf(direction);
     }
 
     getCurrentCenterTile() {
@@ -532,6 +406,7 @@ class Ghost {
     isWalkableTile(tileX, tileY, currentMap) {
         if (tileY < 0 || tileY >= currentMap.length) return false;
         if (tileX < 0 || tileX >= currentMap[0].length) return false;
+        if (currentMap[tileY][tileX] === 3) return this.isEaten() || this.isInHouse();
         return currentMap[tileY][tileX] !== 1;
     }
 
@@ -613,7 +488,7 @@ class Ghost {
             chosenDirection,
             chosenTile: chosenTile ? { x: chosenTile.x, y: chosenTile.y } : null,
             reason: options.reason || "target",
-            mode: this.isEaten() ? "eaten" : (this.isFrightened() ? "frightened" : "normal"),
+            mode: this.isInHouse() ? "house" : this.isEaten() ? "eaten" : (this.isFrightened() ? "frightened" : ghostGlobalMode),
         };
     }
 
@@ -627,8 +502,13 @@ class Ghost {
         }
 
         const randomFn = typeof randomFloat === "function" ? randomFloat : Math.random;
-        const index = Math.floor(randomFn() * candidates.length);
-        return candidates[index];
+        const order = [DIRECTION_UP, DIRECTION_LEFT, DIRECTION_BOTTOM, DIRECTION_RIGHT];
+        const initial = Math.floor(randomFn() * 4);
+        for (let offset=0; offset<4; offset++) {
+            const direction = order[(initial + offset) % 4];
+            if (candidates.includes(direction)) return direction;
+        }
+        return candidates[0];
     }
 
     pickDirectionClosestToTarget(
@@ -655,7 +535,7 @@ class Ghost {
             typeof utils.pickGhostDirection === "function" &&
             normalizedDirectionalCandidates.length > 0
         ) {
-            const mode = this.isEaten() ? "eaten" : (this.isFrightened() ? "frightened" : "normal");
+            const mode = this.isEaten() || this.houseState.exiting ? "eaten" : (this.isFrightened() ? "frightened" : "normal");
             const pickedDirection = utils.pickGhostDirection({
                 candidates: normalizedDirectionalCandidates,
                 targetTile,
@@ -663,7 +543,7 @@ class Ghost {
                 personality: this.personality,
                 map: currentMap,
                 mode,
-                maxPathDepth: this.isEaten() ? 130 : 96,
+                maxPathDepth: currentMap.length * currentMap[0].length,
             });
             if (Number.isFinite(pickedDirection)) {
                 return pickedDirection;
@@ -672,7 +552,6 @@ class Ghost {
 
         let bestDirection = candidates[0];
         let bestScore = Infinity;
-        const currentDirection = this.direction;
 
         for (let i = 0; i < candidates.length; i++) {
             const direction = candidates[i];
@@ -688,9 +567,7 @@ class Ghost {
             const dy = targetTile.y - neighbor.y;
             let score = dx * dx + dy * dy;
 
-            if (direction === currentDirection) {
-                score -= 0.08;
-            }
+
 
             if (
                 score < bestScore ||
@@ -706,8 +583,8 @@ class Ghost {
         return bestDirection;
     }
 
-    calculateNewDirection(currentMap, destX, destY) {
-        const originTile = this.getCurrentCenterTile();
+    calculateNewDirection(currentMap, destX, destY, decisionTile = null) {
+        const originTile = decisionTile || this.getCurrentCenterTile();
         const targetTile = { x: destX, y: destY };
         const availableDirections = this.getAvailableDirections(
             originTile.x,
@@ -730,7 +607,7 @@ class Ghost {
         const reverseDirection = this.getOppositeDirection(this.direction);
         let candidates = availableDirections;
 
-        if (candidates.length > 1) {
+        if (candidates.length > 1 && !this.houseState.exiting) {
             const nonReverse = candidates.filter(
                 (direction) => direction !== reverseDirection
             );
@@ -738,34 +615,19 @@ class Ghost {
                 candidates = nonReverse;
             }
         }
+        if (!this.isEaten() && !this.isFrightened() && typeof activeMap !== "undefined" &&
+            activeMap.restrictedTurns.some(tile => tile.x === originTile.x && tile.y === originTile.y)) {
+            const restricted = candidates.filter(direction => direction !== DIRECTION_UP);
+            if (restricted.length) candidates = restricted;
+        }
         const directionalCandidates = this.buildDirectionalCandidates(
             candidates,
             originTile,
             currentMap
         );
 
-        if (this.isFrightened() && !this.isEaten()) {
-            const canContinue = candidates.includes(this.direction);
-            if (this.frightenedTurnsRemaining <= 0 && canContinue) {
-                this.setDebugIntent({
-                    originTile,
-                    targetTile,
-                    availableDirections,
-                    candidateTiles: directionalCandidates,
-                    chosenDirection: this.direction,
-                    reason: "frightened-hold",
-                });
-                return this.direction;
-            }
-
+        if (this.isFrightened() && !this.isEaten() && !this.houseState.exiting) {
             const picked = this.pickRandomDirection(candidates);
-            const atIntersection = availableDirections.length > 2;
-            if (picked !== this.direction && atIntersection) {
-                this.frightenedTurnsRemaining = Math.max(
-                    0,
-                    this.frightenedTurnsRemaining - 1
-                );
-            }
             this.setDebugIntent({
                 originTile,
                 targetTile,

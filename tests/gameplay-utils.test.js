@@ -231,7 +231,7 @@ test("pickGhostDirection chooses nearest candidate tile", () => {
   assert.equal(direction, 4);
 });
 
-test("pickGhostDirection uses personality tie-break order", () => {
+test("pickGhostDirection uses shared arcade tie-break order", () => {
   const candidates = [
     { direction: 3, x: 8, y: 7 },
     { direction: 2, x: 7, y: 8 },
@@ -252,10 +252,10 @@ test("pickGhostDirection uses personality tie-break order", () => {
   });
 
   assert.equal(blinkyDirection, 3);
-  assert.equal(pinkyDirection, 2);
+  assert.equal(pinkyDirection, 3);
 });
 
-test("pickGhostDirection prefers continuing direction on equal scores", () => {
+test("pickGhostDirection ignores straight-ahead preference on equal scores", () => {
   const direction = gameplayUtils.pickGhostDirection({
     candidates: [
       { direction: 3, x: 8, y: 7 },
@@ -266,7 +266,7 @@ test("pickGhostDirection prefers continuing direction on equal scores", () => {
     personality: "blinky",
   });
 
-  assert.equal(direction, 2);
+  assert.equal(direction, 3);
 });
 
 test("getGhostModeScheduleForLevel returns advanced schedule for high levels", () => {

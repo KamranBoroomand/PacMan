@@ -18,7 +18,7 @@
   <meta name="description" content="A browser arcade homage with seeded replays, daily challenges, and keyboard, touch, and gamepad controls.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="images/icon-192.png">
-  <link rel="icon" type="image/svg+xml" href="images/maze-icon.svg">
+  <link rel="icon" type="image/png" href="images/pacman%20favicon.png">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -40,10 +40,11 @@
     </div>
 
     <div class="game-actions" aria-label="Game controls">
+        <label class="mode-picker" for="map-select"><span>Map</span><select id="map-select"><option value="original-arcade">Original Arcade</option><option value="remix" selected>Remix</option><option value="labyrinth">Labyrinth</option><option value="procedural">Procedural</option></select></label>
         <label class="mode-picker" for="challenge-mode">
           <span>Play mode</span>
           <select id="challenge-mode">
-            <option value="classic">Remix</option>
+            <option value="classic">Standard</option>
             <option value="time-attack">Time Attack</option>
             <option value="no-power">No Power Pellets</option>
             <option value="one-life">One Life</option>

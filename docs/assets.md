@@ -1,12 +1,12 @@
 # Asset provenance
 
-The current asset set uses project-local geometric artwork, captured game screens, a licensed font, and synthesized audio. The repository code license does not grant rights to third-party characters, trademarks, or removed media.
+The character sheets, favicon, and footer movie are restored from repository history. Their source and distribution rights remain unverified. The repository code license does not establish rights to these media, third-party characters, or trademarks.
 
 | Asset | Origin | License / status |
 | --- | --- | --- |
-| `scripts/actor-art.js` | Project-local kite player and hexagonal rival drawings; no imported image sheets | Repository MIT license |
+| `scripts/actor-art.js` | Renders and derives directional, frightened, and eyes-only variants from the historical sheets | Repository code license; sheet rights unresolved |
 | `images/maze-icon.svg` | Project-local P-shaped maze mark | Repository MIT license |
-| `images/icon-192.png`, `images/icon-512.png` | Raster exports of `maze-icon.svg` using `node scripts/build-icons.js` | Same project artwork; actual dimensions match the manifest |
+| `images/icon-192.png`, `images/icon-512.png` | Raster exports of the restored favicon using `node scripts/build-icons.js` | Favicon rights unresolved |
 | `docs/assets/gameplay.png` | Browser capture of the current game | Project UI/artwork; includes the licensed Bungee font |
 | `images/pacman-share.png` | Browser capture of the current game for social previews | Same as the gameplay capture |
 | `fonts/Bungee-Regular.ttf` | [Google Fonts Bungee directory](https://github.com/google/fonts/tree/main/ofl/bungee), file `Bungee-Regular.ttf` | SIL Open Font License 1.1; original notice retained in `fonts/OFL.txt` |
@@ -14,17 +14,13 @@ The current asset set uses project-local geometric artwork, captured game screen
 | Walls, pellets, fruit, transitions, and interface styling | Canvas/CSS definitions in the project source | Repository MIT license |
 | Effects and music | Web Audio oscillator patterns in `scripts/game-config.js` and playback in `scripts/audio.js` | Repository code; no external recordings, samples, or music files |
 
-## Retired media
+## Restored media
 
-The following files were removed from the current tree because their distribution rights could not be established. Their original Git history and contributor information are preserved.
-
-| Removed file | Available origin evidence | Disposition |
+| File | Repository evidence | Status |
 | --- | --- | --- |
-| `images/animations.gif` | Uploaded in `b5802b5`; no upstream source or asset-specific license recorded | Player drawing replaced with project-local geometry |
-| `images/ghost.png` | Uploaded in `b5802b5`; no upstream source or asset-specific license recorded | Rival drawings replaced with project-local geometry |
-| `images/pacman favicon.png` | Uploaded in `b5802b5`; no upstream source or asset-specific license recorded | Replaced by the maze mark; both derived PNG install icons replaced |
-| `images/animation-footer.mov` | Added in `2f91476`; no source or media license recorded | Unused video removed |
-| `images/animation` | One-byte newline placeholder from `b5802b5` | Empty placeholder removed |
-| Previous screenshot/icon contents | Captures or derivatives containing the retired character artwork | Replaced with current captures and maze-mark exports |
+| `images/animations.gif` | Added in `b5802b5`; used for the player animation | Upstream creator and distribution terms not established |
+| `images/ghost.png` | Added in `b5802b5`; used for all four ghosts | Upstream creator and distribution terms not established |
+| `images/pacman favicon.png` | Added in `b5802b5`; used for the favicon and install icons | Upstream creator and distribution terms not established |
+| `images/animation-footer.mov` | Added in `2f91476`; retained but not loaded by the game | Upstream creator and distribution terms not established |
 
 PAC-MAN and the retained historical character names identify the arcade homage. No affiliation, endorsement, or trademark license is claimed. The MIT license and the font license do not settle those identity questions. No legal clearance of the project name is asserted.
