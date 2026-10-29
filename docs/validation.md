@@ -30,7 +30,7 @@ A shared input sequence produces the same simulation hash in the Node reference 
 
 ## Arcade gameplay correction — October 29, 2026
 
-The current branch adds four maps, schema 4 replays, restored historical sprites, and arcade turn and target rules. The original 44 × 31 Remix layout remains available. Node checks cover map connectivity, 1,000 procedural seeds, targeting, tie breaks, mode clocks, ghost release, Elroy, and record separation. Browser checks exercise all map and mode combinations in Chromium, Firefox, WebKit, and mobile Chromium. Screenshot and video evidence is retained under `.artifacts/arcade-review/` and `test-results/`, outside version control.
+The current branch adds four maps, schema 4 replays, restored historical sprites, and arcade turn and target rules. The original 44 × 31 Remix layout remains available. Node checks cover map connectivity, 1,000 procedural seeds, targeting, tie breaks, mode clocks, ghost release, Elroy, and record separation. Browser checks exercise all map and mode combinations in Chromium, Firefox, WebKit, and mobile Chromium. Screenshot and video evidence is retained under `.artifacts/arcade-review/`, `.artifacts/final-gameplay-review/`, and `test-results/`, outside version control.
 
 The ghost algorithms follow [The Pac-Man Dossier](https://www.gamedeveloper.com/design/the-pac-man-dossier) and [Understanding Pac-Man Ghost Behavior](https://gameinternals.com/post/2072558330) for one-tile-ahead turns, Euclidean comparisons, shared tie breaks, targeting quirks, wave timing, reversals, and house priorities. The custom maps retain their own tile layouts and tunnels. Their movement speeds, fruit timing, house geometry, and collision boxes are adaptations of this browser engine rather than a ROM-level copy. Pixel-perfect original arcade timing, historical media distribution rights, physical mobile controls, and long-duration performance remain unqualified.
 
@@ -65,11 +65,11 @@ A fresh temporary home supplied through the browser launch environment allowed F
 
 Firefox then exposed a test-harness issue: navigating directly to the manifest starts a download in that browser. The legacy-cache test now seeds caches from a same-origin blank HTML route. No application change was needed. All twenty applicable Firefox tests pass, and temporary-home cleanup succeeds.
 
-CI retains the Firefox project on `ubuntu-latest`. These local branch changes were not pushed and no workflow was dispatched. Linux fallback execution was unnecessary because local isolated execution succeeded; no new Linux result is claimed.
+CI retains the Firefox project on `ubuntu-latest`. No workflow was dispatched during the local Firefox qualification described above. Linux fallback execution was unnecessary because local isolated execution succeeded; no new Linux result is claimed from that local check.
 
 ## Asset provenance
 
-The [asset register](assets.md) inventories current artwork, screenshots, icons, font, and synthesized audio, with origin and license information. Unverified imported character images, favicon, unused video, and placeholder were removed from the current tree. Both install icons and both public screenshots were replaced. Original Git history and the MIT and OFL notices remain intact.
+The [asset register](assets.md) inventories current artwork, screenshots, icons, font, and synthesized audio, with origin and license information. The historical character sheets, favicon, and unused footer movie are restored in the current tree; their distribution rights remain unverified. The install icons and public screenshots include that artwork. Original Git history and the MIT and OFL notices remain intact.
 
 The retained project name and historical character names are an identity/trademark consideration. No trademark license or legal clearance is asserted; the MIT code license does not establish those rights.
 

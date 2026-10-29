@@ -100,3 +100,34 @@ test('source sprites reach the canvas and ghost debug leaves simulation unchange
   expect(result.sources.some(src=>src.endsWith('ghost.png'))).toBe(true);
   expect(result.before).toBe(result.after);
 });
+
+test('Clyde target boundary follows controlled actor positions in the production runtime',async({page})=>{
+  await page.goto('/');
+  await page.waitForFunction(()=>!!window.__PACMAN_DIAGNOSTICS__);
+  await page.selectOption('#map-select','original-arcade');
+  const result=await page.evaluate(()=>{
+    window.advanceTime(0);startNewGame({seed:12345});window.advanceTime(2000);
+    ghostGlobalMode='chase';
+    pacman.x=10*oneBlockSize;pacman.y=10*oneBlockSize;
+    const clyde=ghosts.find(ghost=>ghost.personality==='clyde');
+    const target=()=>{const pixel=getGhostTargetForPersonality(clyde);return {x:pixel.x/oneBlockSize,y:pixel.y/oneBlockSize};};
+    const samples=[];
+    for(const [x,y] of [[17,10],[18,10],[19,10],[15,15],[16,16]]){
+      clyde.x=x*oneBlockSize;clyde.y=y*oneBlockSize;
+      samples.push({position:{x,y},target:target()});
+    }
+    clyde.x=17*oneBlockSize;clyde.y=10*oneBlockSize;clyde.direction=4;
+    const crossing=[target()];
+    for(let i=0;i<40&&clyde.getMapX()===17;i++)clyde.moveForwards();
+    crossing.push(target());
+    clyde.direction=2;
+    for(let i=0;i<40&&clyde.getMapX()===18;i++)clyde.moveForwards();
+    crossing.push(target());
+    return {phase,scatter:clyde.scatterTile,samples,crossing};
+  });
+  expect(result.phase).toBe('playing');
+  expect(result.samples.map(sample=>sample.target)).toEqual([
+    result.scatter,{x:10,y:10},{x:10,y:10},result.scatter,{x:10,y:10}
+  ]);
+  expect(result.crossing).toEqual([result.scatter,{x:10,y:10},result.scatter]);
+});

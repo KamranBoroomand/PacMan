@@ -48,22 +48,30 @@ test("computeInkyTargetTile mirrors from blinky through pivot", () => {
   assert.deepEqual(target, { x: 16, y: 10 });
 });
 
-test("computeClydeTargetTile switches to scatter when near pacman", () => {
-  const chaseTarget = gameplayUtils.computeClydeTargetTile(
-    { x: 10, y: 10 },
-    { x: 20, y: 20 },
-    { x: 1, y: 29 },
-    8
-  );
-  const scatterTarget = gameplayUtils.computeClydeTargetTile(
-    { x: 10, y: 10 },
-    { x: 11, y: 10 },
-    { x: 1, y: 29 },
-    8
-  );
+test("computeClydeTargetTile uses the Euclidean eight-tile boundary", () => {
+  const pacman = { x: 10, y: 10 };
+  const scatter = { x: 1, y: 29 };
+  for (const [position, expected] of [
+    [{ x: 17, y: 10 }, scatter],
+    [{ x: 18, y: 10 }, pacman],
+    [{ x: 19, y: 10 }, pacman],
+    [{ x: 15, y: 15 }, scatter],
+    [{ x: 16, y: 16 }, pacman],
+  ]) {
+    assert.deepEqual(gameplayUtils.computeClydeTargetTile(pacman, position, scatter), expected);
+  }
+});
 
-  assert.deepEqual(chaseTarget, { x: 10, y: 10 });
-  assert.deepEqual(scatterTarget, { x: 1, y: 29 });
+test("computeClydeTargetTile updates when Clyde crosses the boundary both ways", () => {
+  const pacman = { x: 10, y: 10 };
+  const scatter = { x: 1, y: 29 };
+  const clyde = { x: 19, y: 10 };
+  const targets = [];
+  for (const x of [19, 18, 17, 18, 19]) {
+    clyde.x = x;
+    targets.push(gameplayUtils.computeClydeTargetTile(pacman, clyde, scatter));
+  }
+  assert.deepEqual(targets, [pacman, pacman, scatter, pacman, pacman]);
 });
 
 test("shouldReleaseGhostFromHouse supports dots and timer", () => {
