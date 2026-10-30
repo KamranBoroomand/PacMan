@@ -66,7 +66,7 @@ test("same seed and recorded inputs reproduce full simulation state including pa
   e.run('handleAction("pause")'); e.advance(1);
   e.run('handleAction("up")'); e.advance(120);
   const expected = e.state();
-  e.run("replayLastRun = sanitizeReplayPayload(replayCurrentRun); startReplayLastRun()");
+  e.run("replayLastRun = sanitizeReplayPayload({...replayCurrentRun, finalFrame:simulationFrame, stateHash:SimulationClock.hashState(getSimulationSnapshot())}); startReplayLastRun()");
   e.advance(expected.frame);
   assert.deepEqual(e.state(), expected);
 });
@@ -135,7 +135,7 @@ test("one-life and no-power rules retain their distinct behavior", () => {
   e.advance(110);
   e.run('pacman.x=20;pacman.y=20;pacman.direction=2;pacman.nextDirection=2');
   e.advance(1);
-  assert.equal(e.state().score, 5);
+  assert.equal(e.state().score, 10);
   assert.equal(e.run("isGhostFrightened()"), false);
 });
 

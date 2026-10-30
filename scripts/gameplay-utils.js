@@ -14,37 +14,6 @@
     { mode: "scatter", durationMs: 5000 },
     { mode: "chase", durationMs: Infinity },
   ];
-  const DEFAULT_GHOST_MODE_SCHEDULE_BY_LEVEL = [
-    DEFAULT_GHOST_MODE_SCHEDULE,
-    DEFAULT_GHOST_MODE_SCHEDULE,
-    DEFAULT_GHOST_MODE_SCHEDULE,
-    [
-      { mode: "scatter", durationMs: 5000 },
-      { mode: "chase", durationMs: 20000 },
-      { mode: "scatter", durationMs: 5000 },
-      { mode: "chase", durationMs: 20000 },
-      { mode: "scatter", durationMs: 5000 },
-      { mode: "chase", durationMs: 20000 },
-      { mode: "scatter", durationMs: 5000 },
-      { mode: "chase", durationMs: Infinity },
-    ],
-    [
-      { mode: "scatter", durationMs: 5000 },
-      { mode: "chase", durationMs: 20000 },
-      { mode: "scatter", durationMs: 5000 },
-      { mode: "chase", durationMs: 20000 },
-      { mode: "scatter", durationMs: 5000 },
-      { mode: "chase", durationMs: Infinity },
-    ],
-    [
-      { mode: "scatter", durationMs: 5000 },
-      { mode: "chase", durationMs: 20000 },
-      { mode: "scatter", durationMs: 5000 },
-      { mode: "chase", durationMs: 1033000 },
-      { mode: "scatter", durationMs: 17 },
-      { mode: "chase", durationMs: Infinity },
-    ],
-  ];
   const LEVEL_TUNING_CAP = 14;
 
   function toSafeInteger(value, fallback = 0) {
@@ -134,12 +103,9 @@
 
   function projectAheadTile(tile, direction, distance, bounds) {
     const vector = directionToVector(direction);
-    const maxX = bounds && Number.isFinite(bounds.maxX) ? bounds.maxX : Infinity;
-    const maxY = bounds && Number.isFinite(bounds.maxY) ? bounds.maxY : Infinity;
-
     return {
-      x: clamp(tile.x + vector.x * distance, 0, maxX),
-      y: clamp(tile.y + vector.y * distance, 0, maxY),
+      x: tile.x + vector.x * distance - (direction === DIRECTION_UP ? distance : 0),
+      y: tile.y + vector.y * distance,
     };
   }
 
@@ -155,25 +121,14 @@
     const pivotTile = projectAheadTile(pacmanTile, pacmanDirection, 2, bounds);
     const vectorX = pivotTile.x - blinkyTile.x;
     const vectorY = pivotTile.y - blinkyTile.y;
-    const maxX = bounds && Number.isFinite(bounds.maxX) ? bounds.maxX : Infinity;
-    const maxY = bounds && Number.isFinite(bounds.maxY) ? bounds.maxY : Infinity;
-    return {
-      x: clamp(pivotTile.x + vectorX, 0, maxX),
-      y: clamp(pivotTile.y + vectorY, 0, maxY),
-    };
+    return { x: pivotTile.x + vectorX, y: pivotTile.y + vectorY };
   }
 
   function computeClydeTargetTile(pacmanTile, clydeTile, scatterTile, chaseDistance = 8) {
-    const distance = manhattanDistance(
-      pacmanTile.x,
-      pacmanTile.y,
-      clydeTile.x,
-      clydeTile.y
-    );
-    if (distance > chaseDistance) {
-      return { x: pacmanTile.x, y: pacmanTile.y };
-    }
-    return { x: scatterTile.x, y: scatterTile.y };
+    const dx = pacmanTile.x - clydeTile.x;
+    const dy = pacmanTile.y - clydeTile.y;
+    return dx * dx + dy * dy >= chaseDistance * chaseDistance
+      ? { ...pacmanTile } : { ...scatterTile };
   }
 
   function computeScatterChaseMode(
@@ -201,10 +156,16 @@
     return "chase";
   }
 
-  function getGhostModeScheduleForLevel(level, schedules = DEFAULT_GHOST_MODE_SCHEDULE_BY_LEVEL) {
-    const safeLevel = Math.max(1, toSafeInteger(level, 1));
-    const index = Math.min(schedules.length - 1, safeLevel - 1);
-    return schedules[index];
+  function getGhostModeScheduleForLevel(level) {
+    const firstScatter = level >= 5 ? 5000 : 7000;
+    return [
+      { mode: "scatter", durationMs: firstScatter }, { mode: "chase", durationMs: 20000 },
+      { mode: "scatter", durationMs: firstScatter }, { mode: "chase", durationMs: 20000 },
+      { mode: "scatter", durationMs: 5000 },
+      { mode: "chase", durationMs: level === 1 ? 20000 : level >= 5 ? 1037000 : 1033000 },
+      { mode: "scatter", durationMs: level === 1 ? 5000 : 1000 / 60 },
+      { mode: "chase", durationMs: Infinity },
+    ];
   }
 
   function computeCruiseElroyPhase(remainingDots, phase1Threshold, phase2Threshold) {
@@ -230,37 +191,7 @@
   }
 
   function getGhostDirectionPriority(direction, personality = "blinky") {
-    const defaultOrder = [
-      DIRECTION_UP,
-      DIRECTION_LEFT,
-      DIRECTION_BOTTOM,
-      DIRECTION_RIGHT,
-    ];
-    const personalityOrderByGhost = {
-      blinky: defaultOrder,
-      pinky: [
-        DIRECTION_LEFT,
-        DIRECTION_UP,
-        DIRECTION_RIGHT,
-        DIRECTION_BOTTOM,
-      ],
-      inky: [
-        DIRECTION_BOTTOM,
-        DIRECTION_RIGHT,
-        DIRECTION_UP,
-        DIRECTION_LEFT,
-      ],
-      clyde: [
-        DIRECTION_BOTTOM,
-        DIRECTION_LEFT,
-        DIRECTION_RIGHT,
-        DIRECTION_UP,
-      ],
-    };
-
-    const order = personalityOrderByGhost[personality] || defaultOrder;
-    const priority = order.indexOf(direction);
-    return priority === -1 ? defaultOrder.length : priority;
+    return [DIRECTION_UP, DIRECTION_LEFT, DIRECTION_BOTTOM, DIRECTION_RIGHT].indexOf(direction);
   }
 
   function isWalkableTile(map, x, y) {
@@ -369,7 +300,7 @@
       map.length > 0 &&
       Array.isArray(map[0]) &&
       map[0].length > 0 &&
-      mode !== "frightened";
+      mode === "eaten";
     let bestCandidate = null;
     let bestScore = Infinity;
 
@@ -396,20 +327,6 @@
           : 100000;
         score = pathScore + euclideanScore;
 
-        const exits = getMapNeighbors(map, candidate.x, candidate.y).length;
-        if (mode !== "eaten") {
-          if (exits <= 1) {
-            score += 14;
-          } else if (exits === 2) {
-            score += 1.6;
-          }
-        }
-
-        if (candidate.direction === currentDirection) {
-          score -= 3.2;
-        }
-      } else if (candidate.direction === currentDirection) {
-        score -= 0.08;
       }
 
       const beatsCurrentBest =
@@ -531,12 +448,9 @@
       level: safeLevel,
       pacmanSpeedMultiplier: 1 + (clampedLevel - 1) * 0.014,
       ghostSpeedMultiplier: 1 + (clampedLevel - 1) * 0.022,
-      frightenedDurationMs: Math.max(2200, 6800 - (safeLevel - 1) * 420),
+      frightenedDurationMs: ([6,5,4,3,2,5,2,2,1,5,2,1,1,3,1,1,0,1][safeLevel - 1] || 0) * 1000,
       fruitSpawnDelayMs: Math.max(5000, 12000 - (safeLevel - 1) * 350),
       fruitVisibleMs: Math.max(4200, 10000 - (safeLevel - 1) * 220),
-      frightenedTurnLimit: Math.max(1, 7 - Math.floor((safeLevel - 1) / 2)),
-      blinkyElroyPhase1Multiplier: 1.03 + Math.min(0.05, (safeLevel - 1) * 0.005),
-      blinkyElroyPhase2Multiplier: 1.08 + Math.min(0.09, (safeLevel - 1) * 0.006),
     };
   }
 
@@ -606,7 +520,7 @@
       if (corner.x < 0 || corner.x >= tileCols) {
         continue;
       }
-      if (map[corner.y][corner.x] === 1) {
+      if (map[corner.y][corner.x] === 1 || (map[corner.y][corner.x] === 3 && !options.allowHouseGate)) {
         return true;
       }
     }

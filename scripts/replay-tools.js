@@ -1,6 +1,6 @@
 (function initReplayTools(globalScope) {
-  const REPLAY_SCHEMA_VERSION = 3;
-  const RULESET_VERSION = "remix-2026-10";
+  const REPLAY_SCHEMA_VERSION = 4;
+  const RULESET_VERSION = "arcade-maps-2026-10-v1";
   const MAX_REPLAY_EVENTS = 50000;
   const MAX_REPLAY_FRAMES = 216000;
   const REPLAY_ACTIONS = new Set(["left", "up", "right", "down", "pause", "start"]);
@@ -156,6 +156,12 @@
         (migratedPayload.rulesetVersion !== RULESET_VERSION ||
          migratedPayload.events.some((event) => !normalizeReplayEvent(event)))) return null;
 
+    if (migrationResult.sourceSchemaVersion === REPLAY_SCHEMA_VERSION &&
+        (migratedPayload.events.some((event,index,events) =>
+          !Number.isSafeInteger(event.frame) || event.frame < 0 || event.frame > migratedPayload.finalFrame ||
+          !REPLAY_ACTIONS.has(event.action) || (index > 0 && event.frame < events[index-1].frame)) ||
+          !["classic","time-attack","no-power","one-life"].includes(migratedPayload.challengeMode))) return null;
+
     const hashSeed =
       typeof options.hashSeed === "function"
         ? options.hashSeed
@@ -164,7 +170,11 @@
     const fallbackMode =
       options.defaultChallengeMode || Object.values(challengeModes)[0] || "classic";
 
-    const seed = hashSeed(migratedPayload.seed);
+    if (migrationResult.sourceSchemaVersion === REPLAY_SCHEMA_VERSION &&
+        (!['original-arcade','remix','labyrinth','procedural'].includes(migratedPayload.mapId) ||
+         !Number.isSafeInteger(migratedPayload.seed) || migratedPayload.seed < 1 || migratedPayload.seed > 2147483646 ||
+         !Number.isSafeInteger(migratedPayload.finalFrame) || !/^[a-f0-9]{8}$/.test(migratedPayload.stateHash))) return null;
+    const seed = migrationResult.sourceSchemaVersion === REPLAY_SCHEMA_VERSION ? migratedPayload.seed : hashSeed(migratedPayload.seed);
     const challengeMode = normalizeChallengeMode(
       migratedPayload.challengeMode,
       challengeModes,
@@ -176,6 +186,7 @@
       schemaVersion: REPLAY_SCHEMA_VERSION,
       rulesetVersion: migratedPayload.rulesetVersion || `legacy-v${migrationResult.sourceSchemaVersion}`,
       seed,
+      mapId: migratedPayload.mapId || "remix",
       challengeMode,
       events,
       startedAt: Number.isFinite(Number(migratedPayload.startedAt))

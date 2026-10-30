@@ -1,62 +1,58 @@
 (function (scope) {
-  function polygon(context, points, color) {
-    context.fillStyle = color;
-    context.beginPath();
-    points.forEach(([x, y], index) => index ? context.lineTo(x, y) : context.moveTo(x, y));
-    context.closePath();
-    context.fill();
-  }
-
-  function drawPlayer(context, actor) {
-    context.save();
-    context.translate(actor.x + actor.width / 2, actor.y + actor.height / 2);
-    context.rotate(actor.direction * Math.PI / 2);
-    context.scale(actor.width, actor.height);
-    context.translate(-0.5, -0.5);
-    polygon(context, [[0.94,0.5],[0.26,0.08],[0.08,0.3],[0.3,0.5],[0.08,0.7],[0.26,0.92]], "#FFE279");
-    const inset = actor.currentFrame % 3 * 0.025;
-    polygon(context, [[0.7,0.5],[0.35+inset,0.3],[0.43+inset,0.5],[0.35+inset,0.7]], "#FFF6CF");
-    context.restore();
-  }
-
-  function drawRival(context, actor, flashing = false) {
-    const identities = {
-      blinky: { color: "#FF6B6B", marks: 1 },
-      pinky: { color: "#F5A0DA", marks: 2 },
-      inky: { color: "#6FE3EF", marks: 3 },
-      clyde: { color: "#FFB869", marks: 4 },
-    };
-    const identity = identities[actor.personality] || identities.blinky;
-    context.save();
-    context.translate(actor.x, actor.y);
-    context.scale(actor.width, actor.height);
-    if (actor.isInHouse()) context.globalAlpha = 0.65;
-    if (actor.isEaten()) {
-      context.strokeStyle = "#E8F7FF";
-      context.lineWidth = 0.09;
-      context.strokeRect(0.34, 0.34, 0.32, 0.32);
-      context.fillStyle = "#7CF7D4";
-      context.fillRect(0.44, 0.44, 0.12, 0.12);
-    } else {
-      const frightened = actor.isFrightened();
-      const color = frightened ? (flashing ? "#F4F4F4" : "#4578FF") : identity.color;
-      polygon(context, [[0.22,0.08],[0.78,0.08],[0.96,0.5],[0.78,0.92],[0.22,0.92],[0.04,0.5]], color);
-      context.fillStyle = "#08131D";
-      context.fillRect(0.2, 0.32, 0.6, 0.22);
-      const offsetX = actor.direction === 4 ? 0.07 : actor.direction === 2 ? -0.07 : 0;
-      const offsetY = actor.direction === 1 ? 0.035 : actor.direction === 3 ? -0.035 : 0;
-      context.fillStyle = frightened ? "#FFE279" : "#FFFFFF";
-      context.fillRect(0.37 + offsetX, 0.36 + offsetY, 0.26, 0.13);
-      context.fillStyle = "#08131D";
-      const marks = frightened ? 2 : identity.marks;
-      for (let index = 0; index < marks; index++) {
-        context.fillRect(0.5 - marks * 0.06 + index * 0.12, 0.68, 0.07, 0.1);
+  const player = typeof Image === 'function' ? new Image() : null;
+  const sheet = typeof Image === 'function' ? new Image() : null;
+  if (player) player.src = 'images/animations.gif';
+  if (sheet) sheet.src = 'images/ghost.png';
+  const crops = { blinky:[0,0], pinky:[0,120], inky:[175,120], clyde:[175,0] };
+  const variants = new Map();
+  function ghostSprite(personality, frightened, flashing, eaten, direction) {
+    if (!sheet || !sheet.complete || !sheet.naturalWidth) return null;
+    const key = [personality,frightened,flashing,eaten,direction].join(':');
+    if (variants.has(key)) return variants.get(key);
+    const canvas = document.createElement('canvas'); canvas.width=canvas.height=16;
+    const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;
+    const [x,y]=crops[personality]||crops.blinky;
+    ctx.drawImage(sheet,x,y,125,116,0,0,16,16);
+    const pixels=ctx.getImageData(0,0,16,16);
+    for(let i=0;i<pixels.data.length;i+=4) {
+      const d=pixels.data;
+      const white=d[i]>230&&d[i+1]>230&&d[i+2]>230;
+      const pupil=d[i]<30&&d[i+1]>100&&d[i+2]>180;
+      if(eaten && !white && !pupil) d[i+3]=0;
+      else if(frightened && d[i+3] && !white && !pupil) {
+        d[i]=flashing?255:33;d[i+1]=flashing?255:33;d[i+2]=255;
       }
+      if(pupil) {d[i]=255;d[i+1]=255;d[i+2]=255;}
     }
+    ctx.putImageData(pixels,0,0);
+    const dx=direction===4?1:direction===2?-1:0;
+    const dy=direction===1?1:direction===3?-1:0;
+    ctx.fillStyle=frightened?'#FEB897':'#009DFF';
+    ctx.fillRect(5+dx,7+dy,2,2);ctx.fillRect(11+dx,7+dy,2,2);
+    variants.set(key,canvas);return canvas;
+  }
+  function drawPlayer(context, actor) {
+    if(!player||!player.complete||!player.naturalWidth) return;
+    context.save();context.imageSmoothingEnabled=false;
+    context.translate(actor.x+actor.width/2,actor.y+actor.height/2);
+    context.rotate(actor.direction*Math.PI/2);
+    context.drawImage(player,(actor.currentFrame-1)*20,0,20,20,-actor.width/2,-actor.height/2,actor.width,actor.height);
     context.restore();
   }
-
-  const api = { drawPlayer, drawRival };
-  if (typeof module !== "undefined" && module.exports) module.exports = api;
-  scope.ActorArt = api;
+  function drawRival(context, actor, flashing=false) {
+    const sprite=ghostSprite(actor.personality,actor.isFrightened(),flashing,actor.isEaten(),actor.direction);
+    if(!sprite) return;
+    context.save();context.imageSmoothingEnabled=false;
+    const size=actor.width*1.2, x=actor.x-actor.width*.1,y=actor.y-actor.height*.1;
+    const frame = typeof lastUpdateNow === 'number' ? Math.floor(lastUpdateNow / 140) % 2 : 0;
+    if (frame && !actor.isEaten()) {
+      context.drawImage(sprite,0,0,16,14,x,y,size,size*14/16);
+      context.save();context.translate(x+size,y+size*14/16);context.scale(-1,1);
+      context.drawImage(sprite,0,14,16,2,0,0,size,size*2/16);context.restore();
+    } else context.drawImage(sprite,x,y,size,size);
+    context.restore();
+  }
+  const api={drawPlayer,drawRival};
+  if(typeof module!=='undefined'&&module.exports) module.exports=api;
+  scope.ActorArt=api;
 })(globalThis);

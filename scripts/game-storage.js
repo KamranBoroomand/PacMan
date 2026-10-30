@@ -167,6 +167,8 @@
               !["classic", "time-attack", "no-power", "one-life"].includes(entry.mode) ||
               !Number.isSafeInteger(Number(entry.seed))) continue;
           const safe = {
+            mapId: ["original-arcade", "remix", "labyrinth", "procedural"].includes(entry.mapId) ? entry.mapId : "remix",
+            rulesetVersion: typeof entry.rulesetVersion === "string" ? entry.rulesetVersion : "remix-2026-10",
             mode: entry.mode, seed: Number(entry.seed),
             bestScore: Math.max(0, toSafeInteger(entry.bestScore)),
             bestTimeMs: Number.isFinite(Number(entry.bestTimeMs)) && Number(entry.bestTimeMs) > 0 ? Number(entry.bestTimeMs) : Infinity,
@@ -174,7 +176,7 @@
             completedRuns: Math.max(0, toSafeInteger(entry.completedRuns)),
             lastPlayed: typeof entry.lastPlayed === "string" ? entry.lastPlayed : "",
           };
-          entries[`${safe.mode}:${safe.seed}`] = safe;
+          entries[entry.rulesetVersion ? `${safe.rulesetVersion}:${safe.mapId}:${safe.mode}:${safe.seed}` : `${safe.mode}:${safe.seed}`] = safe;
         }
       }
       return { entries };
@@ -196,9 +198,9 @@
   }
 
   function getTodayKey(now = new Date()) {
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(now.getUTCDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   }
 

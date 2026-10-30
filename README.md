@@ -1,18 +1,21 @@
 # PacMan
 
-A static browser arcade game with a wide remix maze, four ghost personalities, seeded replays, and daily challenges. Built with JavaScript, Canvas 2D, and Web Audio. No backend or runtime dependencies.
+A static browser arcade game with four maps, four ghost personalities, seeded replays, and daily challenges. Built with JavaScript, Canvas 2D, and Web Audio. No backend or runtime dependencies.
 
 ![A seeded game in progress, with a responsive scoreboard above the maze](docs/assets/gameplay.png)
 
 ## Play
 
-Collect the pellets, use power pellets to turn the chase around, and clear the maze to advance. The default **Remix** mode uses a custom 44 × 31 maze and project-specific movement, scoring, and difficulty rules. It does not reproduce the original arcade rules exactly.
+Collect pellets and clear the maze to advance. Choose a map independently of the play mode:
 
-- **Remix:** three lives, fruit bonuses, bonus-life milestones, and increasing difficulty.
-- **Time Attack:** two minutes of playing time; clearing a level adds 18 seconds.
-- **No Power Pellets:** power pellets still score, but do not frighten ghosts.
-- **One Life:** one starting life and no bonus lives.
-- **Daily challenge:** a date-derived seed with local results and a completion streak.
+- **Original Arcade:** a 28 × 31 maze with 240 dots, four energizers, one paired tunnel, a central ghost house, and arcade corner targets.
+- **Remix:** the existing 44 × 31 layout.
+- **Labyrinth:** a fixed 35 × 31 circuit maze with staggered crossings.
+- **Procedural:** a 29 × 31 maze built from the selected seed. Candidates are checked for reachable pellets and a safe house exit.
+
+**Standard** starts with three lives and awards a bonus life at each 10,000-point milestone. **Time Attack** starts at two minutes, counts only active play, pauses with the game, and adds 18 seconds per cleared level. **No Power Pellets** replaces energizers with ordinary dots. **One Life** starts with one life and never awards another. The selected mode and map appear in the scoreboard.
+
+Seeds must be integers from 1 to 2,147,483,646. On fixed maps, a seed controls gameplay randomness; it does not change the maze. On Procedural, the seed also determines the maze. Apply Seed starts a fresh run. Restart keeps the current seed and map. The daily challenge uses the Procedural map, Standard mode, and a UTC calendar date; its date changes at 00:00 UTC.
 
 | Input | Controls |
 | --- | --- |
@@ -43,7 +46,7 @@ The build validates offline module coverage and copies the runtime to `dist/`. P
 ## Engineering
 
 - A 60 Hz fixed-step simulation uses a logical clock for phase transitions, frightened effects, fruit, and challenge timing. Pausing freezes those timers. Rendering uses its own frame schedule with bounded catch-up.
-- Inputs are applied and recorded at tick boundaries. Replay schema 3 identifies its timing ruleset and carries a seed, ordered inputs, final frame, and state hash. Playback stops at the recorded final frame and reports whether the state hash matches. Older replay files can be read, but playback requires their original release because their timing rules differ.
+- Inputs are applied and recorded at tick boundaries. Replay schema 4 identifies the map, mode, seed, ruleset, ordered inputs, final frame, and state hash. Playback stops at the recorded final frame and reports whether the state hash matches. Older replay files can be read, but playback requires their original release because their timing rules differ.
 - Player turns remain buffered until legal. Ghosts use personality targets, scatter/chase schedules, house-release conditions, frightened behavior, and swept collision checks.
 - A responsive HTML scoreboard keeps text legible independently of maze scaling. Wall geometry is cached at the current display scale; dynamic actors and collectibles remain on the canvas.
 - Scores, settings, daily history, and leaderboards stay in browser storage. Invalid saved records and denied storage access fall back safely. Local scores are editable by the player and are not competitive verification.
@@ -87,6 +90,6 @@ When runtime assets change, increment `CACHE_VERSION` in `service-worker.js`. Ke
 
 Project code is provided under the [MIT license](LICENSE). Bungee is bundled under the [SIL Open Font License](fonts/OFL.txt), with its original copyright notice, from the [Google Fonts repository](https://github.com/google/fonts/tree/main/ofl/bungee). Audio uses synthesized tones.
 
-PAC-MAN and related characters belong to their respective rights holders. This is an independent homage, without affiliation or endorsement. Current character drawings and maze-mark icons use project-local geometry. Media without established distribution rights has been removed from the current tree. See the [asset register](docs/assets.md) for file origins, licenses, and the remaining project-name/trademark limitation.
+PAC-MAN and related characters belong to their respective rights holders. This is an independent homage, without affiliation or endorsement. Player and ghost sprites, the favicon, and the footer movie were restored from repository history. The project owner confirms holding direct authorization for the restored media; the licensing documents are maintained privately and have not been independently audited here. See the [asset register](docs/assets.md) for file origins and licensing status.
 
 [Roadmap](ROADMAP.md)

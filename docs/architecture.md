@@ -6,10 +6,10 @@ The application is a static site. Scripts load in dependency order with `defer`;
 | --- | --- |
 | `game-config.js` | Phase constants, challenge identifiers, palettes, schedules, tuning, and tone patterns |
 | `simulation-clock.js` | Bounded fixed-step frame scheduler and stable state digest |
-| `maze.js` | Remix maze construction, spawn point, and independent map copies |
-| `gameplay-utils.js` | Targeting, path selection, collision math, difficulty, and scoring helpers |
+| `maze.js` | Four-map registry, metadata, generation, and validation |
+| `gameplay-utils.js` | Arcade targeting and turn choice, collision math, difficulty, and scoring helpers |
 | `pacman.js`, `ghost.js` | Actor movement, buffered turns, ghost decisions, and drawing dispatch |
-| `actor-art.js` | Project-local geometric player and rival rendering, including frightened and returning states |
+| `actor-art.js` | Historical sprite-sheet rendering, including frightened and returning variants |
 | `maze-renderer.js` | Wall-layer rendering and invalidation by map, palette, or pixel scale |
 | `hud.js` | Text-only updates to the semantic scoreboard |
 | `audio.js` | Web Audio lifecycle, mixer, notes, ducking, pause, and cleanup |
@@ -30,19 +30,21 @@ The scheduler resets on visibility changes. Focus loss requests one recorded pau
 
 ## Replay contract
 
-Current exports use `schemaVersion: 3` and `rulesetVersion: "remix-2026-10"`. The persisted challenge identifier `classic` now displays as **Remix**, preserving saved settings and mode keys.
+Current exports use `schemaVersion: 4` and `rulesetVersion: "arcade-maps-2026-10-v1"`. Each replay carries a map ID, mode, seed, ordered events, final frame, and state hash. The saved `classic` mode identifier displays as **Standard**; map selection is stored separately.
+
+Legacy schema 1–3 files may be read for inspection, but playback requires their original release because the maze and movement rules changed. Current imports reject unknown maps, modes, seeds, actions, and rulesets, missing terminal digests, and unordered input frames.
 
 A run starts with its seed, a fresh random-number state, maze, actors, score, and timers. Direction, pause, and cutscene/start inputs are queued and recorded on the exact tick that consumes them. Inputs with equal tick numbers retain their order. Playback bypasses live gamepad input and uses the same phase and gameplay functions.
 
 The diagnostic export includes `finalFrame` and an eight-character state hash for regression comparisons. The hash covers the maze, actor state, random-number state, score, lives, phase, and timers. Playback stops at this frame and reports a match, mismatch, or missing digest. The completed viewer can replay again or start a new session. The digest detects accidental divergence; it is not a cryptographic signature or proof that a score is legitimate.
 
-Imports are limited to 2 MB files, 50,000 events, and one hour of tick indices. Current-format imports reject unknown actions, unsupported rulesets, and unsupported future schemas. Version 1/2 payloads retain legacy metadata, but their playback is refused with an explanation because wall-time behavior cannot be reconstructed by the new engine.
+Imports are limited to 2 MB files, 50,000 events, and one hour of tick indices. Current-format imports reject unknown actions, unsupported rulesets, and unsupported future schemas. Version 1–3 payloads retain legacy metadata, but their playback is refused with an explanation because wall-time behavior cannot be reconstructed by the new engine.
 
 `window.advanceTime(ms)` enters manual stepping, with a bounded duration. It advances the actual update functions without adding performance samples. `resumeRealtime()` on the diagnostics object returns to wall-time scheduling with a fresh accumulator. `render_game_to_text()` describes player-visible state. These interfaces let browser tests check deterministic behavior without racing wall timers.
 
 ## Offline releases
 
-Installation precaches the complete runtime, local font, icons, and geometric actor renderer. Activation removes only caches owned by this app and scope. The worker serves its cached HTML and corresponding modules together, preventing a network-fresh shell from loading older cached code. Unknown requests are fetched without being stored.
+Installation precaches the complete runtime, local font, icons, and restored actor sheets. Activation removes only caches owned by this app and scope. The worker serves its cached HTML and corresponding modules together, preventing a network-fresh shell from loading older cached code. Unknown requests are fetched without being stored.
 
 A replacement worker waits until **Update Ready** sends `SKIP_WAITING`. After activation the page reloads. Cache names include the registration path so installations under different subpaths remain separate. Bump `CACHE_VERSION` for each changed runtime release.
 

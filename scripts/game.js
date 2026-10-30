@@ -93,6 +93,10 @@ let previousRenderNow = null;
 let manualStepping = false;
 let pendingInputs = [];
 let ghostModeElapsedMs = 0;
+let lastPelletAt = 0;
+let houseGlobalCounter = false;
+let houseGlobalDots = 0;
+let elroySuspended = false;
 let runDurationMs = 0;
 let pausedPhase = null;
 let pausedPhaseUntil = 0;
@@ -133,6 +137,7 @@ let replayLastRun = null;
 let replayPlayback = null;
 let runStartedAtMs = 0;
 let activeRunIsDaily = false;
+let activeDailyDate = null;
 let activeRunIsReplay = false;
 let runResultCommitted = false;
 let simStepRequests = 0;
@@ -167,7 +172,8 @@ let createRect = (x, y, width, height, color) => {
 };
 
 // Legend: 1 = wall, 2 = pellet, 4 = power pellet, 0 = empty path
-const pacmanStart = Maze.start;
+let activeMap = Maze.createDefinition("remix", 1);
+let pacmanStart = activeMap.start;
 const cloneClassicMap = Maze.createMap;
 let map = cloneClassicMap();
 
@@ -218,7 +224,7 @@ function hashSeed(value) {
 }
 
 function setRunRandomSeed(seed) {
-  runRandomState = hashSeed(seed);
+  runRandomState = seed;
 }
 
 function randomFloat() {
@@ -342,31 +348,16 @@ function noteUserIntent() {
 }
 
 function getGhostModeScheduleForLevel(levelNumber) {
-  const safe = Math.max(1, Number.parseInt(levelNumber, 10) || 1);
-  const index = Math.min(GHOST_MODE_SCHEDULE_BY_LEVEL.length - 1, safe - 1);
-  return GHOST_MODE_SCHEDULE_BY_LEVEL[index];
+  return GameplayUtils.getGhostModeScheduleForLevel(levelNumber);
 }
 
 function getCruiseElroyThresholds(levelNumber, totalDots) {
   const safeLevel = Math.max(1, Number.parseInt(levelNumber, 10) || 1);
   const safeDots = Math.max(1, Number.parseInt(totalDots, 10) || 1);
 
-  let phase1 = Math.floor(safeDots * 0.24);
-  let phase2 = Math.floor(safeDots * 0.12);
-
-  if (safeLevel >= 3) {
-    phase1 = Math.floor(safeDots * 0.32);
-    phase2 = Math.floor(safeDots * 0.16);
-  }
-  if (safeLevel >= 7) {
-    phase1 = Math.floor(safeDots * 0.38);
-    phase2 = Math.floor(safeDots * 0.2);
-  }
-
-  return {
-    phase1: Math.max(12, phase1),
-    phase2: Math.max(6, phase2),
-  };
+  const threshold = safeLevel === 1 ? 20 : safeLevel === 2 ? 30 : safeLevel <= 5 ? 40 : safeLevel <= 8 ? 50 : safeLevel <= 11 ? 60 : safeLevel <= 14 ? 80 : safeLevel <= 18 ? 100 : 120;
+  const scale = activeMap.id === "original-arcade" ? 1 : safeDots / 244;
+  return { phase1: Math.round(threshold * scale), phase2: Math.round(threshold * scale / 2) };
 }
 
 function getCruiseElroyPhase(remainingDots, thresholds) {
@@ -377,10 +368,6 @@ function getCruiseElroyPhase(remainingDots, thresholds) {
   return 0;
 }
 
-function getFrightenedTurnLimit() {
-  if (!currentLevelTuning) return 6;
-  return Math.max(1, Number.parseInt(currentLevelTuning.frightenedTurnLimit, 10) || 6);
-}
 
 function isReplayRunning() {
   return Boolean(replayPlayback);
@@ -593,6 +580,7 @@ function validateSettings(raw) {
     mobileInputMode:
       raw && raw.mobileInputMode === "stick" ? "stick" : "buttons",
     challengeMode,
+    mapId: raw && Maze.registry[raw.mapId] ? raw.mapId : "remix",
     paletteMode,
     reducedMotion: typeof (raw && raw.reducedMotion) === "boolean" ? raw.reducedMotion : window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     largeHud: Boolean(raw && raw.largeHud),
@@ -662,7 +650,7 @@ function readHighScoreFromStorage() {
   if (storage && typeof storage.readHighScore === "function") {
     return storage.readHighScore({
       storage: getBrowserStorage(),
-      key: HIGH_SCORE_STORAGE_KEY,
+      key: `${HIGH_SCORE_STORAGE_KEY}:${ReplayTools.RULESET_VERSION}:${settings.mapId || "remix"}:${settings.challengeMode}`,
     });
   }
   return 0;
@@ -673,7 +661,7 @@ function persistHighScore() {
   if (storage && typeof storage.persistHighScore === "function") {
     storage.persistHighScore({
       storage: getBrowserStorage(),
-      key: HIGH_SCORE_STORAGE_KEY,
+      key: `${HIGH_SCORE_STORAGE_KEY}:${ReplayTools.RULESET_VERSION}:${settings.mapId || "remix"}:${settings.challengeMode}`,
       highScore,
     });
   }
@@ -737,9 +725,9 @@ function getTodayDailyKey() {
     return storage.getTodayKey(new Date());
   }
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(now.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -757,8 +745,10 @@ function addLeaderboardResult({ mode, seed, scoreValue, durationMs, completed, d
 
   const normalizedMode = mode || CHALLENGE_MODES.CLASSIC;
   const normalizedSeed = Number.parseInt(seed, 10) || 0;
-  const key = `${normalizedMode}:${normalizedSeed}`;
+  const key = `${ReplayTools.RULESET_VERSION}:${activeMap.id}:${normalizedMode}:${normalizedSeed}`;
   const existing = leaderboardState.entries[key] || {
+    mapId: activeMap.id,
+    rulesetVersion: ReplayTools.RULESET_VERSION,
     mode: normalizedMode,
     seed: normalizedSeed,
     bestScore: 0,
@@ -807,11 +797,11 @@ function addDailyHistoryEntry({ dateKey, seed, scoreValue, completed }) {
   dailyChallengeState.history = history.slice(-30);
   dailyChallengeState.lastPlayedDate = safeDate;
 
-  const yesterday = new Date(`${safeDate}T00:00:00`);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const y = yesterday.getFullYear();
-  const m = String(yesterday.getMonth() + 1).padStart(2, "0");
-  const d = String(yesterday.getDate()).padStart(2, "0");
+  const yesterday = new Date(`${safeDate}T00:00:00Z`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const y = yesterday.getUTCFullYear();
+  const m = String(yesterday.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(yesterday.getUTCDate()).padStart(2, "0");
   const yesterdayKey = `${y}-${m}-${d}`;
 
   if (nextEntry.completed) {
@@ -937,7 +927,7 @@ function renderSeedStatus(message, options = {}) {
     runSeedInput.value = String(activeRunSeed);
   }
   if (!seedStatus) return;
-  seedStatus.textContent = message || `Active seed: ${activeRunSeed}`;
+  seedStatus.textContent = message || `Active seed: ${activeRunSeed} · ${activeMap.name}: ${activeMap.id === "procedural" ? "maze + random events" : "fixed maze; random events only"}`;
 }
 
 function previewRunSeedStatus() {
@@ -948,13 +938,13 @@ function previewRunSeedStatus() {
     return;
   }
 
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    renderSeedStatus("Seed must be a positive integer.", { syncInput: false });
+  const parsed = Number(raw);
+  if (!/^[1-9][0-9]*$/.test(raw) || !Number.isSafeInteger(parsed) || parsed > 2147483646) {
+    renderSeedStatus("Seed must be an integer from 1 to 2147483646.", { syncInput: false });
     return;
   }
 
-  const normalized = hashSeed(parsed);
+  const normalized = parsed;
   if (normalized === activeRunSeed) {
     renderSeedStatus(undefined, { syncInput: false });
     return;
@@ -1052,7 +1042,7 @@ function renderLeaderboard() {
   for (let i = 0; i < top.length; i++) {
     const entry = top[i];
     lines.push(
-      `${i + 1}. ${entry.mode} · seed ${entry.seed} · score ${entry.bestScore} · best ${formatDurationShort(entry.bestTimeMs)} · runs ${entry.runs}`
+      `${i + 1}. ${entry.mapId || "legacy remix"} · ${entry.mode} · seed ${entry.seed} · score ${entry.bestScore} · best ${formatDurationShort(entry.bestTimeMs)} · runs ${entry.runs}`
     );
   }
   leaderboardOutput.textContent = lines.join("\n");
@@ -1136,6 +1126,8 @@ function renderSettingsUi() {
   if (mobileInputModeSelect) {
     mobileInputModeSelect.value = settings.mobileInputMode;
   }
+  const mapPicker = document.getElementById("map-select");
+  if (mapPicker) mapPicker.value = settings.mapId || "remix";
   if (challengeModeSelect) {
     challengeModeSelect.value = settings.challengeMode;
   }
@@ -1209,12 +1201,13 @@ function applyGamepadMapFromInputs() {
 
 function applyRunSeedFromInput() {
   if (!runSeedInput) return;
-  const parsed = Number.parseInt(runSeedInput.value.trim(), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    renderSeedStatus("Seed must be a positive integer.", { syncInput: false });
+  const raw = runSeedInput.value.trim();
+  const parsed = Number(raw);
+  if (!/^[1-9][0-9]*$/.test(raw) || !Number.isSafeInteger(parsed) || parsed > 2147483646) {
+    renderSeedStatus("Seed must be an integer from 1 to 2147483646.", { syncInput: false });
     return;
   }
-  startNewGame({ seed: hashSeed(parsed) });
+  startNewGame({ seed: parsed });
   renderSeedStatus(`Applied seed: ${activeRunSeed}`);
 }
 
@@ -1361,7 +1354,7 @@ function resizeCanvasToFitViewport() {
   logicalH = (rows + HUD_ROWS) * oneBlockSize;
 
   const availW = getCanvasMaxWidth();
-  const availH = Math.max(220, window.innerHeight - measureNonCanvasUiHeight());
+  const availH = Math.max(400, window.innerHeight - measureNonCanvasUiHeight());
   const coarsePointer = window.matchMedia("(hover: none), (pointer: coarse)").matches;
   const arcadeScaleActive = arcadeViewEnabled && canUseArcadeView();
   const maxScale = arcadeScaleActive ? 1.65 : (coarsePointer ? 1 : 1.12);
@@ -1401,7 +1394,10 @@ function rebuildMapCaches() {
 }
 
 function resetMap() {
-  map = cloneClassicMap();
+  activeMap = Maze.createDefinition(settings.mapId || "remix", activeRunSeed);
+  pacmanStart = activeMap.start;
+  map = activeMap.grid.map(row => row.map(cell => settings.challengeMode === CHALLENGE_MODES.NO_POWER && cell === 4 ? 2 : cell));
+  resizeCanvasToFitViewport();
   rebuildMapCaches();
 }
 
@@ -1655,7 +1651,6 @@ function getLevelTuning(levelNumber) {
     frightenedDurationMs: Math.max(2200, 6800 - (safeLevel - 1) * 420),
     fruitSpawnDelayMs: Math.max(5000, 12000 - (safeLevel - 1) * 350),
     fruitVisibleMs: Math.max(4200, 10000 - (safeLevel - 1) * 220),
-    frightenedTurnLimit: Math.max(1, 7 - Math.floor((safeLevel - 1) / 2)),
     blinkyElroyPhase1Multiplier: 1.03 + Math.min(0.05, (safeLevel - 1) * 0.005),
     blinkyElroyPhase2Multiplier: 1.08 + Math.min(0.09, (safeLevel - 1) * 0.006),
   };
@@ -1720,78 +1715,39 @@ function activateFrightenedMode(durationMs) {
   ghostEatChain = 0;
   for (let i = 0; i < ghosts.length; i++) {
     const ghost = ghosts[i];
-    if (!ghost || ghost.isEaten() || ghost.isInHouse()) continue;
-    ghost.reverseDirection();
+    if (!ghost || ghost.isEaten()) continue;
+    ghost.pendingReverse = true;
+    ghost.suppressFrightened = false;
   }
   playGameSfx("powerPellet");
 }
 
 function getGhostHouseExitTarget() {
-  return tileToPixel(GHOST_HOUSE_EXIT_TILE);
+  return tileToPixel(activeMap.exit);
 }
 
 function getGhostHouseExitTargetForPersonality(personality) {
-  if (
-    personality &&
-    Object.prototype.hasOwnProperty.call(
-      GHOST_HOUSE_EXIT_BY_PERSONALITY,
-      personality
-    )
-  ) {
-    return tileToPixel(GHOST_HOUSE_EXIT_BY_PERSONALITY[personality]);
-  }
-
   return getGhostHouseExitTarget();
 }
 
 function getGhostHomeTarget() {
-  return tileToPixel(GHOST_HOME_TILE);
+  return tileToPixel(activeMap.home);
 }
 
 function canReleaseGhostFromHouse(ghost) {
   if (!ghost || !ghost.houseState) return false;
 
-  const utils = getGameplayUtils();
-  const elapsed = Math.max(0, lastUpdateNow - roundStartAt);
-  if (utils && typeof utils.shouldReleaseGhostFromHouse === "function") {
-    const shouldRelease = utils.shouldReleaseGhostFromHouse({
-      dotsEatenThisRound,
-      releaseDotThreshold: ghost.houseState.releaseDotThreshold,
-      elapsedMs: elapsed,
-      forceReleaseMs: ghost.houseState.forceReleaseMs,
-    });
-    if (shouldRelease) return true;
-    return elapsed >= 12000;
+  if (ghosts.find(g => g.isInHouse()) !== ghost) return false;
+  if (lastUpdateNow - lastPelletAt >= (level >= 5 ? 3000 : 4000)) return true;
+  if (houseGlobalCounter) {
+    const threshold = {pinky:7,inky:17,clyde:32}[ghost.personality];
+    if (houseGlobalDots !== threshold) return false;
+    if (ghost.personality === "clyde") houseGlobalCounter = false;
+    return true;
   }
-
-  return elapsed >= 12000 || (
-    dotsEatenThisRound >= ghost.houseState.releaseDotThreshold ||
-    elapsed >= ghost.houseState.forceReleaseMs
-  );
+  return ghost.houseDots >= ghost.houseState.releaseDotThreshold;
 }
 
-function getFrightenedTargetForGhost(ghost) {
-  const utils = getGameplayUtils();
-  if (
-    utils &&
-    typeof utils.pickFarthestTarget === "function" &&
-    pacman &&
-    typeof pacman.getMapX === "function"
-  ) {
-    const target = utils.pickFarthestTarget(
-      randomTargetsForGhosts,
-      pacman.getMapX() * oneBlockSize,
-      pacman.getMapY() * oneBlockSize,
-      randomFloat
-    );
-    if (target) return target;
-  }
-
-  const fallbackIndex = ghost
-    ? (ghost.randomTargetIndex + 2) % randomTargetsForGhosts.length
-    : 0;
-  return randomTargetsForGhosts[fallbackIndex];
-}
 
 function getGhostScatterTarget(ghost) {
   if (!ghost || !ghost.scatterTile) {
@@ -1803,7 +1759,7 @@ function getGhostScatterTarget(ghost) {
 function getGhostTargetForPersonality(ghost) {
   if (!ghost || !pacman) return randomTargetsForGhosts[0];
 
-  if (ghostGlobalMode === "scatter") {
+  if (ghostGlobalMode === "scatter" && !(ghost.personality === "blinky" && ghost.elroyPhase > 0)) {
     return getGhostScatterTarget(ghost);
   }
 
@@ -1865,8 +1821,8 @@ function updateGhostGlobalMode() {
   if (ghostGlobalMode !== lastGhostGlobalMode) {
     for (let i = 0; i < ghosts.length; i++) {
       const ghost = ghosts[i];
-      if (!ghost || ghost.isEaten() || ghost.isInHouse()) continue;
-      ghost.reverseDirection();
+      if (!ghost || ghost.isEaten()) continue;
+      ghost.pendingReverse = true;
     }
     lastGhostGlobalMode = ghostGlobalMode;
   }
@@ -1880,30 +1836,17 @@ function getCurrentGhostModeLabel() {
 function updateCruiseElroyState() {
   const thresholds = getCruiseElroyThresholds(level, initialFoodCount);
   const phaseLevel = getCruiseElroyPhase(remainingFoodCount, thresholds);
-  const phase1Scale =
-    currentLevelTuning && Number.isFinite(currentLevelTuning.blinkyElroyPhase1Multiplier)
-      ? currentLevelTuning.blinkyElroyPhase1Multiplier
-      : 1.05;
-  const phase2Scale =
-    currentLevelTuning && Number.isFinite(currentLevelTuning.blinkyElroyPhase2Multiplier)
-      ? currentLevelTuning.blinkyElroyPhase2Multiplier
-      : 1.12;
-
+  if (!ghosts.some(g => g.personality === "clyde" && g.isInHouse())) elroySuspended = false;
   for (let i = 0; i < ghosts.length; i++) {
     const ghost = ghosts[i];
-    if (!ghost || !Number.isFinite(ghost.baseCruiseSpeed)) continue;
-
-    let speedScale = 1;
-    if (
-      ghost.personality === "blinky" &&
-      !ghost.isEaten() &&
-      !ghost.isFrightened() &&
-      phaseLevel > 0
-    ) {
-      speedScale = phaseLevel >= 2 ? phase2Scale : phase1Scale;
-    }
-
-    ghost.setLevelSpeed(quantizeSpeed(ghost.baseCruiseSpeed * speedScale));
+    ghost.elroyPhase = ghost.personality === "blinky" ? phaseLevel : 0;
+    if (ghost.personality === "blinky" && elroySuspended) ghost.elroyPhase = 0;
+    const tile = ghost.getCurrentCenterTile();
+    const tunnel = activeMap.tunnels.some(t => t.y === tile.y && (tile.x < 6 || tile.x >= activeMap.width - 6));
+    const normal = level === 1 ? .75 : level < 5 ? .85 : .95;
+    const elroy = ghost.elroyPhase > 0 ? normal + .05 * ghost.elroyPhase : normal;
+    const ratio = tunnel ? (level === 1 ? .4 : level < 5 ? .45 : .5) : elroy;
+    ghost.setLevelSpeed(quantizeSpeed((oneBlockSize / 16 / .8) * ratio));
   }
 }
 
@@ -2129,7 +2072,8 @@ function createGhosts() {
 
   for (let i = 0; i < GHOST_DEFINITIONS.length; i++) {
     const def = GHOST_DEFINITIONS[i];
-    const spawnPixel = tileToPixel(def.spawnTile);
+    const spawn = activeMap.ghostSpawns[def.id];
+    const spawnPixel = tileToPixel(spawn);
 
     const ghost = new Ghost(
       spawnPixel.x,
@@ -2141,10 +2085,10 @@ function createGhosts() {
       {
         personality: def.id,
         displayName: def.displayName,
-        scatterTile: def.scatterTile,
+        scatterTile: activeMap.scatterTargets[def.id],
         startInHouse: def.startInHouse,
-        releaseDotThreshold: def.releaseDotThreshold,
-        forceReleaseMs: def.forceReleaseMs,
+        releaseDotThreshold: def.id === "inky" ? (level === 1 ? 30 : 0) : def.id === "clyde" ? (level === 1 ? 60 : level === 2 ? 50 : 0) : 0,
+        forceReleaseMs: Infinity,
       }
     );
 
@@ -2165,7 +2109,9 @@ function disposeActors() {
 }
 
 function prepareRound() {
+  const previousCounters = houseGlobalCounter ? ghosts.map(ghost => ghost.houseDots) : null;
   ghostModeElapsedMs = 0;
+  lastPelletAt = lastUpdateNow;
   clearFrightenedMode();
   ghostGlobalMode = "scatter";
   lastGhostGlobalMode = "scatter";
@@ -2173,6 +2119,7 @@ function prepareRound() {
   updateRandomTargetsForGhosts();
   createNewPacman();
   createGhosts();
+  if (previousCounters) ghosts.forEach((ghost,index) => { ghost.houseDots = previousCounters[index] || 0; });
   resetFruitState();
 }
 
@@ -2180,6 +2127,7 @@ function beginReplayCapture(seed) {
   replayCurrentRun = {
     schemaVersion: getReplaySchemaVersion(),
     rulesetVersion: ReplayTools.RULESET_VERSION,
+    mapId: settings.mapId || "remix",
     seed,
     challengeMode: settings.challengeMode,
     events: [],
@@ -2274,7 +2222,7 @@ function importReplayPayload(payload) {
   const importedSchema = Number.isFinite(sourceVersion) ? sourceVersion : currentSchema;
   if (importedSchema < currentSchema) {
     renderReplayStatus(
-      `Replay migrated v${importedSchema}->v${currentSchema} (${sanitized.events.length} inputs).`
+      `Replay v${importedSchema} retained for its original release. Its rules differ from this version.`
     );
   } else {
     renderReplayStatus(`Replay imported (${sanitized.events.length} inputs).`);
@@ -2324,6 +2272,7 @@ function applyImportedSettingsSnapshot(snapshot, options = {}) {
     ...settings,
     ...validated,
     challengeMode: settings.challengeMode,
+    mapId: settings.mapId,
     simDebugEnabled: settings.simDebugEnabled,
     simPaused: false,
   };
@@ -2421,6 +2370,7 @@ function startReplayLastRun() {
   replayCurrentRun = null;
 
   replayPlayback = {
+    mapId: replayLastRun.mapId,
     seed: replayLastRun.seed,
     challengeMode: replayLastRun.challengeMode || CHALLENGE_MODES.CLASSIC,
     events: replayLastRun.events.slice().sort((a, b) => a.frame - b.frame),
@@ -2430,6 +2380,7 @@ function startReplayLastRun() {
     completed: false,
   };
   settings.challengeMode = replayPlayback.challengeMode;
+  settings.mapId = replayPlayback.mapId || "remix";
   persistSettings();
   renderSettingsUi();
   startNewGame({ replay: true, seed: replayPlayback.seed, skipCapture: true });
@@ -2487,12 +2438,15 @@ function maybeBeginAttractMode() {
 }
 
 function startDailyChallenge() {
+  finalizeRunResult({ completed: levelsClearedThisRun > 0 });
+  finalizeReplayCapture({ reason: "daily-challenge" });
   const dateKey = getTodayDailyKey();
   const dailySeed = computeDailySeed(dateKey);
   settings.challengeMode = CHALLENGE_MODES.CLASSIC;
+  settings.mapId = "procedural";
   persistSettings();
   renderSettingsUi();
-  startNewGame({ seed: dailySeed, daily: true });
+  startNewGame({ seed: dailySeed, daily: true, skipFinalizeResult: true });
   addHudToast(`Daily seed ${dailySeed}`, getCurrentPalette().textMode, 1300);
   trackAnalyticsEvent("daily_challenge_started", { date: dateKey, seed: dailySeed });
 }
@@ -2514,7 +2468,7 @@ function finalizeRunResult(options = {}) {
   }
 
   const completed = Boolean(options.completed);
-  const dateKey = getTodayDailyKey();
+  const dateKey = activeDailyDate || getTodayDailyKey();
   const durationMs = getCurrentRunDurationMs();
   addLeaderboardResult({
     mode: settings.challengeMode,
@@ -2555,11 +2509,14 @@ function startNewGame(options = {}) {
   if (!options.skipCapture) finalizeReplayCapture({ reason: "new-game" });
 
   const replaySeed = options.seed;
+  if (replaySeed !== undefined && (!Number.isSafeInteger(replaySeed) || replaySeed < 1 || replaySeed > 2147483646)) throw Error("Invalid seed");
   const requestedSeed = Number.isFinite(replaySeed) ? replaySeed : createRunSeed();
   activeRunSeed = requestedSeed;
   activeRunIsDaily = Boolean(options.daily);
+  activeDailyDate = options.daily ? (options.dailyDate || getTodayDailyKey()) : null;
   activeRunIsReplay = Boolean(options.replay);
   runResultCommitted = false;
+  highScore = readHighScoreFromStorage();
   runStartedAtMs = Date.now();
   levelsClearedThisRun = 0;
   gameAudio.reset();
@@ -2594,6 +2551,7 @@ function startNewGame(options = {}) {
       ? 1
       : STARTING_LIVES;
   level = START_LEVEL;
+  houseGlobalCounter = false; houseGlobalDots = 0; elroySuspended = false;
   nextBonusLifeScore = BONUS_LIFE_STEP;
   scoreAnnouncementMilestone = 0;
   lastAnnouncedLives = lives;
@@ -2616,6 +2574,7 @@ function startNewGame(options = {}) {
 }
 
 function startNextLevel() {
+  houseGlobalCounter = false; houseGlobalDots = 0; elroySuspended = false;
   level += 1;
   applyLevelTuning(level);
   announceForAssistiveTools(`Level ${level}.`, { minGapMs: 0, force: true });
@@ -2633,13 +2592,14 @@ function startNextLevel() {
 
 function restartCurrentRun() {
   const keepDailyRun = activeRunIsDaily && settings.challengeMode === CHALLENGE_MODES.CLASSIC;
-  startNewGame({ seed: activeRunSeed, daily: keepDailyRun });
+  startNewGame({ seed: activeRunSeed, daily: keepDailyRun, dailyDate: activeDailyDate });
   playGameSfx("ui");
 }
 
 function shouldHotApplyChallengeMode() {
   if (isReplayRunning() || attractModeActive) return false;
   return (
+    phase === GAME_PHASE_GAMEOVER ||
     phase === GAME_PHASE_READY ||
     phase === GAME_PHASE_PLAYING ||
     phase === GAME_PHASE_PAUSED ||
@@ -2650,6 +2610,8 @@ function shouldHotApplyChallengeMode() {
 }
 
 function applyChallengeModeSetting(nextMode) {
+  finalizeRunResult({ completed: levelsClearedThisRun > 0 });
+  finalizeReplayCapture({ reason: "mode-change" });
   const replacingReplay = isReplayRunning();
   if (replacingReplay) replayPlayback = null;
   settings.challengeMode = Object.values(CHALLENGE_MODES).includes(nextMode)
@@ -3188,6 +3150,7 @@ function updatePhaseTransitions() {
       return;
     }
 
+    houseGlobalCounter = true; houseGlobalDots = 0; elroySuspended = true;
     prepareRound();
     setPhase(GAME_PHASE_READY, {
       durationMs: ROUND_READY_MS,
@@ -3233,6 +3196,11 @@ function updateGameplay() {
   if (eatResult && eatResult.atePellet) {
     remainingFoodCount = Math.max(0, remainingFoodCount - 1);
     dotsEatenThisRound += 1;
+    if (houseGlobalCounter) houseGlobalDots += 1;
+    else {
+      const waiting = ghosts.find(g => g.isInHouse());
+      if (waiting) waiting.houseDots += 1;
+    }
   }
 
   if (eatResult && eatResult.atePowerPellet) {
@@ -3468,9 +3436,8 @@ function drawGhostDebugOverlay() {
       canvasContext.stroke();
     }
 
-    const label = `${ghost.displayName || ghost.personality} ${directionCodeToShortLabel(
-      intent.chosenDirection
-    )}`;
+    const tile = ghost.getCurrentCenterTile();
+    const label = `${ghost.displayName} (${tile.x},${tile.y}) ${intent.mode} ${directionCodeToShortLabel(ghost.direction)}→${directionCodeToShortLabel(intent.chosenDirection)} ${intent.reason}`;
     canvasContext.fillStyle = color;
     canvasContext.fillText(
       label,
@@ -3495,7 +3462,7 @@ function drawScoreHud() {
   if (!hud) return;
   const phaseLabels = { start: "Ready to play", ready: "Get ready", playing: "In play",
     paused: "Paused", dying: "Life lost", intermission: "Stage clear", cutscene: "Intermission", gameover: "Game over" };
-  const challengeLabels = { classic: "Remix", "time-attack": "Time attack", "no-power": "No power", "one-life": "One life" };
+  const challengeLabels = { classic: "Standard", "time-attack": "Time attack", "no-power": "No power", "one-life": "One life" };
   const status = [];
   if (settings.challengeMode === CHALLENGE_MODES.TIME_ATTACK) status.push(`${Math.ceil(challengeTimeRemainingMs / 1000)}s left`);
   if (isGhostFrightened()) status.push(`Power ${Math.ceil((frightenedUntil - lastUpdateNow) / 1000)}s`);
@@ -3503,7 +3470,7 @@ function drawScoreHud() {
   else if (isReplayRunning()) status.push(replayPlayback.completed ? "Replay complete" : "Replay");
   status.push(`${remainingFoodCount} pellets`);
   hud.render({ score, best: highScore, level, lives, phase: phaseLabels[phase],
-    mode: challengeLabels[settings.challengeMode], status: status.join(" · "),
+    mode: `${activeMap.name} · ${challengeLabels[settings.challengeMode]}`, status: status.join(" · "),
     notice: hudToasts.length ? hudToasts[hudToasts.length - 1].text : "",
     seed: `Seed ${activeRunSeed}`, ghost: getCurrentGhostModeLabel().toLowerCase() });
 }
@@ -3875,6 +3842,15 @@ function wireUiEvents() {
     });
   }
 
+  const mapPicker = document.getElementById("map-select");
+  if (mapPicker) mapPicker.addEventListener("change", () => {
+    finalizeRunResult({ completed: levelsClearedThisRun > 0 });
+    finalizeReplayCapture({ reason: "map-change" });
+    settings.mapId = mapPicker.value;
+    persistSettings();
+    startNewGame({ seed: activeRunSeed, skipFinalizeResult: true });
+    renderSettingsUi();
+  });
   if (challengeModeSelect) {
     challengeModeSelect.addEventListener("change", (event) => {
       applyChallengeModeSetting(event.target.value);
@@ -4109,11 +4085,13 @@ function renderGameToText() {
     tileX: ghost.getMapX(),
     tileY: ghost.getMapY(),
     state: ghost.state,
+    direction: ghost.direction, mode: ghost.isEaten() ? "eaten" : ghost.isFrightened() ? "frightened" : ghostGlobalMode,
     intent: ghost.debugIntent
       ? {
           targetTile: ghost.debugIntent.targetTile,
           chosenTile: ghost.debugIntent.chosenTile,
           chosenDirection: ghost.debugIntent.chosenDirection,
+          reason: ghost.debugIntent.reason,
         }
       : null,
   }));
@@ -4164,15 +4142,16 @@ function stepDeterministicFrames(frameCount) {
 function getSimulationSnapshot() {
   const actor = (value) => value ? {
     x: value.x, y: value.y, direction: value.direction, nextDirection: value.nextDirection,
-    state: value.state, house: value.houseState, speed: value.speed,
-    frightenedTurnsRemaining: value.frightenedTurnsRemaining,
-    randomTargetIndex: value.randomTargetIndex,
+    state: value.state, house: value.houseState, houseDots: value.houseDots, suppressFrightened: value.suppressFrightened, speed: value.speed,
+    plannedDirection: value.plannedDirection, pendingReverse: value.pendingReverse, elroyPhase: value.elroyPhase,
+
   } : null;
   return {
     frame: simulationFrame, time: lastUpdateNow, phase, phaseUntil, pausedPhase, pausedPhaseUntil,
+    mapId: activeMap.id, rulesetVersion: ReplayTools.RULESET_VERSION,
     mode: settings.challengeMode, seed: activeRunSeed, randomState: runRandomState,
     map, score, lives, level, nextBonusLifeScore, remainingFoodCount, dotsEatenThisRound,
-    roundStartAt, frightenedUntil, ghostEatChain, ghostGlobalMode, ghostModeElapsedMs,
+    roundStartAt, lastPelletAt, houseGlobalCounter, houseGlobalDots, elroySuspended, frightenedUntil, ghostEatChain, ghostGlobalMode, ghostModeElapsedMs,
     challengeTimeRemainingMs, runDurationMs, fruit, activeCutscene,
     pacman: actor(pacman), ghosts: ghosts.map(actor), randomTargetsForGhosts,
   };

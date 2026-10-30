@@ -19,6 +19,10 @@
           const offset = (blockSize - inner) / 2;
           for (let y = 0; y < map.length; y++) {
             for (let x = 0; x < map[y].length; x++) {
+              if (map[y][x] === 3) {
+                painter.fillStyle = "#F5A0DA";
+                painter.fillRect(x * blockSize, (y + .4) * blockSize, blockSize, blockSize * .15);
+              }
               if (map[y][x] !== 1) continue;
               painter.fillStyle = palette.wallOuter;
               painter.fillRect(x * blockSize, y * blockSize, blockSize, blockSize);
