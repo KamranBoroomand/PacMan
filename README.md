@@ -90,6 +90,6 @@ When runtime assets change, increment `CACHE_VERSION` in `service-worker.js`. Ke
 
 Project code is provided under the [MIT license](LICENSE). Bungee is bundled under the [SIL Open Font License](fonts/OFL.txt), with its original copyright notice, from the [Google Fonts repository](https://github.com/google/fonts/tree/main/ofl/bungee). Audio uses synthesized tones.
 
-PAC-MAN and related characters belong to their respective rights holders. This is an independent homage, without affiliation or endorsement. Player and ghost sprites, the favicon, and the footer movie were restored from repository history. Their distribution rights remain unverified; see the asset register before publishing this branch. See the [asset register](docs/assets.md) for file origins, licenses, and the remaining project-name/trademark limitation.
+PAC-MAN and related characters belong to their respective rights holders. This is an independent homage, without affiliation or endorsement. Player and ghost sprites, the favicon, and the footer movie were restored from repository history. The project owner confirms holding direct authorization for the restored media; the licensing documents are maintained privately and have not been independently audited here. See the [asset register](docs/assets.md) for file origins and licensing status.
 
 [Roadmap](ROADMAP.md)

@@ -32,7 +32,7 @@ A shared input sequence produces the same simulation hash in the Node reference 
 
 The current branch adds four maps, schema 4 replays, restored historical sprites, and arcade turn and target rules. The original 44 × 31 Remix layout remains available. Node checks cover map connectivity, 1,000 procedural seeds, targeting, tie breaks, mode clocks, ghost release, Elroy, and record separation. Browser checks exercise all map and mode combinations in Chromium, Firefox, WebKit, and mobile Chromium. Screenshot and video evidence is retained under `.artifacts/arcade-review/`, `.artifacts/final-gameplay-review/`, and `test-results/`, outside version control.
 
-The ghost algorithms follow [The Pac-Man Dossier](https://www.gamedeveloper.com/design/the-pac-man-dossier) and [Understanding Pac-Man Ghost Behavior](https://gameinternals.com/post/2072558330) for one-tile-ahead turns, Euclidean comparisons, shared tie breaks, targeting quirks, wave timing, reversals, and house priorities. The custom maps retain their own tile layouts and tunnels. Their movement speeds, fruit timing, house geometry, and collision boxes are adaptations of this browser engine rather than a ROM-level copy. Pixel-perfect original arcade timing, historical media distribution rights, physical mobile controls, and long-duration performance remain unqualified.
+The ghost algorithms follow [The Pac-Man Dossier](https://www.gamedeveloper.com/design/the-pac-man-dossier) and [Understanding Pac-Man Ghost Behavior](https://gameinternals.com/post/2072558330) for one-tile-ahead turns, Euclidean comparisons, shared tie breaks, targeting quirks, wave timing, reversals, and house priorities. The custom maps retain their own tile layouts and tunnels. Their movement speeds, fruit timing, house geometry, and collision boxes are adaptations of this browser engine rather than a ROM-level copy. Pixel-perfect original arcade timing, physical mobile controls, and long-duration performance remain unqualified.
 
 ## Performance
 
@@ -69,9 +69,9 @@ CI retains the Firefox project on `ubuntu-latest`. No workflow was dispatched du
 
 ## Asset provenance
 
-The [asset register](assets.md) inventories current artwork, screenshots, icons, font, and synthesized audio, with origin and license information. The historical character sheets, favicon, and unused footer movie are restored in the current tree; their distribution rights remain unverified. The install icons and public screenshots include that artwork. Original Git history and the MIT and OFL notices remain intact.
+The [asset register](assets.md) inventories current artwork, screenshots, icons, font, and synthesized audio, with origin and license information. The historical character sheets, favicon, and unused footer movie are restored in the current tree. The project owner confirms holding direct authorization for the restored media and maintains the licensing documents privately; their terms were not independently audited here. The install icons and public screenshots include that artwork. Original Git history and the MIT and OFL notices remain intact.
 
-The retained project name and historical character names are an identity/trademark consideration. No trademark license or legal clearance is asserted; the MIT code license does not establish those rights.
+The retained project name and historical character names are an identity/trademark consideration. This validation records technical behavior and the owner's media authorization; it does not assess trademark rights in the project name. The MIT code license does not establish those rights.
 
 ## Limits
 
